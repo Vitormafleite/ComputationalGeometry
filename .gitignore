@@ -1,0 +1,49 @@
+# === Build output ===
+build/
+*.o
+*.obj
+*.exe
+*.out
+*.log
+*.a
+*.so
+*.dll
+*.dSYM/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# === Editor/IDE files ===
+.vscode/
+.idea/
+*.code-workspace
+
+# === OS-specific ===
+.DS_Store
+Thumbs.db
+
+# === Backup/swap files ===
+*~
+*.swp
+*.bak
+
+# Build artifacts
+GeometricModeling
+Makefile
+cmake_install.cmake
+
+# Optional
+imgui.ini
+
+# === ImGui example binaries (if cloned manually instead of submodule) ===
+external/imgui/examples/
+external/imgui/.vs/
+
+# === GLAD generated junk (if any) ===
+external/glad/CMakeLists.txt.user
+
+# === Compilation database ===
+compile_commands.json
+
+
