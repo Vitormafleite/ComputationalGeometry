@@ -1,0 +1,3 @@
+/home/vitor/Projects/ComputationalGeometry/build/CMakeFiles/GeometricModeling.dir
+/home/vitor/Projects/ComputationalGeometry/build/CMakeFiles/edit_cache.dir
+/home/vitor/Projects/ComputationalGeometry/build/CMakeFiles/rebuild_cache.dir

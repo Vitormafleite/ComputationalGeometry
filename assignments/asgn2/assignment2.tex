@@ -1,0 +1,31 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage[T1]{fontenc}
+
+\title{Tarefa 2}
+\author{Vitor Manoel}
+\date{\today}
+
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+\maketitle
+
+\section*{Questão 1}
+
+a) Podemos entender $\theta$(a,b) como o arco entre os vetores a e b, para expressar isso usando $\theta$(a) e $\theta$(b), 
+entendemos que essas expressões retornam os arcos com o vetor padrão do plano 2D (1,0), ou seja, a simples diferença $\theta$(a)-$\theta$(b)
+parece resolver o problema, entretanto, alguns casos onde os vetores estão em certos quadrantes retornam resultados negativos, o que não desejamos,
+para corrigir isso, limitamos a expressão para o intervalo [0,8), acrescentando resto de 8 no final da expressão, por fim temos:
+
+\[
+\theta(a, b) = (\theta(b) - \theta(a)) \bmod 8
+\]
+
+b)
+
+
+
+\end{document}

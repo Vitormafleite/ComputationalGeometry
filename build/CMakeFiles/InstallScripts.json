@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/vitor/Projects/ComputationalGeometry/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
