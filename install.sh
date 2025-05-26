@@ -10,12 +10,12 @@ echo "==> Starting installation script..."
 if command -v pacman &> /dev/null; then
     echo "==> Detected Arch-based system."
     echo "==> Installing dependencies with pacman..."
-    sudo pacman -Syu --noconfirm base-devel cmake glfw-x11 glad git
+    sudo pacman -Syu --noconfirm base-devel cmake glm glad glfw-x11 git
 elif command -v apt &> /dev/null; then
     echo "==> Detected Debian-based system."
     echo "==> Installing dependencies with apt..."
     sudo apt update
-    sudo apt install -y build-essential cmake libglfw3-dev libgl1-mesa-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev git
+    sudo apt install -y build-essential cmake libglfw3-dev libgl1-mesa-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libglm-dev git
 else
     echo "!! Unsupported package manager. Please install dependencies manually."
     exit 1

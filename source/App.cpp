@@ -10,17 +10,12 @@ void App::run(){
     if (!renderer_m.init(800, 600, "Geometric Modeling")) {
         return;
     }
-
+    
     while (!renderer_m.shouldClose()) {
         renderer_m.beginFrame();
-
-        // ImGui UI rendering
-        //ImGui::Begin("Demo");
-        //ImGui::Text("Welcome to the Geometric Modeling App!");
-        //ImGui::End();
-
-        // (TODO: invoke your geometry logic and visualizers here)
-
+        renderer_m.loadUIElements();
+        //renderer_m.drawTestTriangle();
+        renderer_m.renderMesh();
         renderer_m.endFrame();
     }
 

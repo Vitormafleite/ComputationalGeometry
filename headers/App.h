@@ -5,15 +5,12 @@
 
 class App {
 public:
-    // Constructor and Destructor
     App();
     ~App();
 
-    // Public Methods
     void run();
 
 private:
-    
     Renderer renderer_m;
 
 };  
