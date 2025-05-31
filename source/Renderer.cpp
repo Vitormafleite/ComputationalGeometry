@@ -48,7 +48,7 @@ bool Renderer::init(int width, int height, const char* title) {
         return false;
     }
 
-    view = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -3.0f));
+    view = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -20.0f));
     projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
 
     return true;
@@ -56,6 +56,8 @@ bool Renderer::init(int width, int height, const char* title) {
 
 void Renderer::beginFrame() {
     glfwPollEvents();
+
+    handleCameraInput();
 
     glClearColor(0.752f, 0.752f, 0.752f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -74,12 +76,16 @@ void Renderer::loadUIElements() {
     if (ImGui::Button("Load OBJ")) {
         loadRequested = true;
     }
+
+    ImGui::Checkbox("Wireframe Mode", &wireframeMode);
     ImGui::End();
 
     if (loadRequested) {
         loadMesh(objPath);
         loadRequested = false;
     }
+
+    glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
 }
 
 
@@ -122,14 +128,11 @@ void Renderer::loadMesh(const std::string& path) {
 }
 
 void Renderer::renderMesh() {
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Enable wireframe
-
     shader.use();
     shader.setMat4("uModel", glm::mat4(1.0f));
     shader.setMat4("uView", view);
     shader.setMat4("uProjection", projection);
     mesh_m.draw();
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Restore to normal
 }
 
 void Renderer::drawTestTriangle() {
@@ -163,3 +166,54 @@ void Renderer::drawTestTriangle() {
     glDeleteBuffers(1, &testVBO);
     glDeleteVertexArrays(1, &testVAO);
 }
+
+void Renderer::handleCameraInput() {
+    // Calculate delta time
+    float currentFrame = glfwGetTime();
+    deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
+
+    // Keyboard input
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) camera.processKeyboard('F', deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) camera.processKeyboard('B', deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) camera.processKeyboard('L', deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) camera.processKeyboard('R', deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) camera.processKeyboard('U', deltaTime); 
+    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) camera.processKeyboard('D', deltaTime); 
+
+    // Right mouse button pressed -> lock cursor
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS && !rightMousePressed) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        rightMousePressed = true;
+        firstMouse = true; // reset to avoid jump
+    }
+
+    // Right mouse button released -> unlock cursor
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE && rightMousePressed) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        rightMousePressed = false;
+    }
+
+    // Only handle mouse movement if right mouse is held
+    if (rightMousePressed) {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+
+        if (firstMouse) {
+            lastX = xpos;
+            lastY = ypos;
+            firstMouse = false;
+        }
+
+        float xOffset = xpos - lastX;
+        float yOffset = lastY - ypos; // Inverted Y
+        lastX = xpos;
+        lastY = ypos;
+
+        camera.processMouse(xOffset, yOffset);
+    }
+
+    // Update the view matrix
+    view = camera.getViewMatrix();
+}
+
