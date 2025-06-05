@@ -32,6 +32,8 @@ private:
     bool wireframeMode = false;
     bool rightMousePressed = false;
 
+    unsigned int samples = 8;
+
     //All shader stuff
     Shader shader;
     glm::mat4 view;
