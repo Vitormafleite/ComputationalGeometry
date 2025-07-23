@@ -13,6 +13,8 @@ public:
 private:
     Renderer renderer_m;
 
+    int screenHeight;
+    int screenWidth;
 };  
 
 #endif // APP_H

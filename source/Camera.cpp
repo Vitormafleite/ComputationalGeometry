@@ -1,6 +1,7 @@
 #include "Camera.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/constants.hpp>
+#include <GLFW/glfw3.h>
 
 Camera::Camera(glm::vec3 position, float yaw, float pitch)
     : position(position), yaw(yaw), pitch(pitch), worldUp(glm::vec3(0.0f, 1.0f, 0.0f)) {

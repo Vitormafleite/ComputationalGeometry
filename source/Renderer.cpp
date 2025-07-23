@@ -1,12 +1,6 @@
 #include "../headers/Renderer.h"
 #include <iostream>
 
-float triangle[] = {
-    -0.5f, -0.5f, 0.0f,
-     0.5f, -0.5f, 0.0f,
-     0.0f,  0.5f, 0.0f
-};
-
 Renderer::Renderer() : window(nullptr) {}
 
 Renderer::~Renderer() {
@@ -46,6 +40,9 @@ bool Renderer::init(int width, int height, const char* title) {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
     glEnable(GL_PROGRAM_POINT_SIZE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 
     if (!shader.load("../shaders/shader.vert", "../shaders/shader.frag")) {
         std::cerr << "Failed to load shaders!\n";
@@ -58,12 +55,21 @@ bool Renderer::init(int width, int height, const char* title) {
     return true;
 }
 
+void Renderer::loadOBJFilesFromFolder(const std::string& folderPath) {
+    objFileNames.clear();
+    for (const auto& entry : fs::directory_iterator(folderPath)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".obj") {
+            objFileNames.push_back(entry.path().filename().string());
+        }
+    }
+}
+
 void Renderer::beginFrame() {
     glfwPollEvents();
 
     handleCameraInput();\
 
-    glClearColor(0.752f, 0.752f, 0.752f, 1.0f);
+    glClearColor(0.7f, 0.7f, 0.7f, 1.0f); // grey color
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     ImGui_ImplOpenGL3_NewFrame();
@@ -71,22 +77,69 @@ void Renderer::beginFrame() {
     ImGui::NewFrame();
 }
 
+
 void Renderer::loadUIElements() {
     static char objPath[256] = "";
     static bool loadRequested = false;
+    static bool runMerge = false;
+
+    static int selectedIndex = 0;
 
     ImGui::Begin("OBJ Loader");
-    ImGui::InputText("OBJ File Path", objPath, IM_ARRAYSIZE(objPath));
+
+    //ImGui::InputText("OBJ File Path", objPath, IM_ARRAYSIZE(objPath));
+    loadOBJFilesFromFolder("../assets");
+
+    if (ImGui::BeginCombo("Select OBJ File", objFileNames[selectedIndex].c_str())) {
+    for (int i = 0; i < objFileNames.size(); ++i) {
+        bool isSelected = (selectedIndex == i);
+        if (ImGui::Selectable(objFileNames[i].c_str(), isSelected)) {
+            selectedIndex = i;
+            // Optionally load the file here
+        }
+        if (isSelected)
+            ImGui::SetItemDefaultFocus();
+    }
+    ImGui::EndCombo();
+}
+
     if (ImGui::Button("Load OBJ")) {
         loadRequested = true;
     }
 
     ImGui::Checkbox("Wireframe Mode", &wireframeMode);
+
+    if (ImGui::Button("Start Merge")) {
+        runMerge = true;
+    }
+
+    if (ImGui::Button("Previous Merge Step")) {
+        if(mergeStep > 0){
+            mergeStep--;
+            //setup the Vaos and Vbos Again
+        }
+    }
+    
+    if (ImGui::Button("Next Merge Step")) {
+        mergeStep++;
+        //setup the Vaos and Vbos Again
+        //also add condition so we cant go further then the last merge step
+    }
+
     ImGui::End();
 
     if (loadRequested) {
-        loadMesh(objPath);
+        if (!objFileNames.empty()) {
+            std::string fullPath = "../assets/" + objFileNames[selectedIndex];
+            loadMesh(fullPath);
+        }
+
         loadRequested = false;
+    }
+
+    if (runMerge) {
+        runMergeHull();
+        runMerge = false;
     }
 
     glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
@@ -124,57 +177,26 @@ void Renderer::loadMesh(const std::string& path) {
         return;
     }
 
+    ClearBuffers();
+
     if (!mesh_m.loadSubmeshFromOBJ(path)) {
         std::cerr << "Failed to load mesh: " << path << std::endl;
     } else {
         std::cout << "Loaded mesh: " << path << std::endl;
+        setupPointCloud();
     }
 }
 
-void Renderer::renderMesh() {
-    for (int i = 0; i < mesh_m.submeshVAOs.size(); ++i) {
-        glBindVertexArray(mesh_m.submeshVAOs[i]);
-        glDrawArrays(GL_POINTS, 0, mesh_m.submeshesVertices[i].size());
+void Renderer::runMergeHull() {
+    if (mesh_m.submeshesVertices.size() == 0){
+        std::cerr << "The mesh has no set of points \n";
+        return;
     }
-    glBindVertexArray(0);
 
-    shader.use();
-    shader.setMat4("uModel", glm::mat4(1.0f));
-    shader.setMat4("uView", view);
-    shader.setMat4("uProjection", projection);
-
-
-    GLint pointSizeLoc = glGetUniformLocation(shader.getID(), "uPointSize");
-    glUniform1f(pointSizeLoc, 6.0f);
-
-    mesh_m.draw();
-}
-
-void Renderer::drawTestTriangle() {
-    float triangle[] = {
-        -0.5f, -0.5f, 0.0f,
-         0.5f, -0.5f, 0.0f,
-         0.0f,  0.5f, 0.0f
-    };
-
-    unsigned int testVAO, testVBO;
-    glGenVertexArrays(1, &testVAO);
-    glGenBuffers(1, &testVBO);
-
-    glBindVertexArray(testVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, testVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(triangle), triangle, GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-
-    glBindVertexArray(testVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindVertexArray(0);
-
-    // Cleanup to not leak VAO/VBO
-    glDeleteBuffers(1, &testVBO);
-    glDeleteVertexArrays(1, &testVAO);
+    mesh_m.sortSubmeshes();
+    mesh_m.partitionSubmeshes();
+    mesh_m.buildPartitionConvexHulls();
+    setupMiniHulls(mergeStep);
 }
 
 void Renderer::handleCameraInput() {
@@ -227,3 +249,101 @@ void Renderer::handleCameraInput() {
     view = camera.getViewMatrix();
 }
 
+void Renderer::setupPointCloud(){
+    // Clean up old buffers
+    for (GLuint vao : pointCloudVAOs) {
+        glDeleteVertexArrays(1, &vao);
+    }
+    for (GLuint vbo : pointCloudVBOs) {
+        glDeleteBuffers(1, &vbo);
+    }
+
+    pointCloudVAOs.clear();
+    pointCloudVBOs.clear();
+
+    for (const auto& submesh : mesh_m.submeshesVertices) {
+        GLuint vao, vbo;
+
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, submesh.size() * sizeof(Vector3), submesh.data(), GL_STATIC_DRAW);
+
+        glEnableVertexAttribArray(0); 
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3), (void*)0);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+
+        pointCloudVAOs.push_back(vao);
+        pointCloudVBOs.push_back(vbo);
+        pointCloudVertexCounts.push_back(static_cast<GLsizei>(submesh.size()));
+    }
+}
+
+void Renderer::setupMiniHulls(int step) {
+    // Cleanup anterior
+    for (GLuint vao : miniHullVAOs) glDeleteVertexArrays(1, &vao);
+    for (GLuint vbo : miniHullVBOs) glDeleteBuffers(1, &vbo);
+
+    miniHullVAOs.clear();
+    miniHullVBOs.clear();
+    miniHullVertexCounts.clear();
+
+    for (const auto& meshGroup : mesh_m.localHulls) {
+        for (const auto& mesh : meshGroup) {
+            std::vector<glm::vec3> vertices = mesh.extractTriangleVertices();
+            if (vertices.empty()) continue;
+
+            GLuint vao, vbo;
+            glGenVertexArrays(1, &vao);
+            glGenBuffers(1, &vbo);
+
+            glBindVertexArray(vao);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), vertices.data(), GL_STATIC_DRAW);
+
+            glEnableVertexAttribArray(0); // aPos
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+
+            glBindVertexArray(0);
+
+            miniHullVAOs.push_back(vao);
+            miniHullVBOs.push_back(vbo);
+            miniHullVertexCounts.push_back(static_cast<GLsizei>(vertices.size()));
+        }
+    }
+}
+
+//GLint pointSizeLoc = glGetUniformLocation(shader.getID(), "uPointSize");
+//glUniform1f(pointSizeLoc, 1.0f);
+
+void Renderer::renderGeometry() {
+    shader.use();
+    shader.setMat4("uModel", glm::mat4(1.0f));
+    shader.setMat4("uView", view);
+    shader.setMat4("uProjection", projection);
+
+    shader.setBool("uRenderingPoints", true);
+    for (size_t i = 0; i < pointCloudVAOs.size(); ++i) {
+        glBindVertexArray(pointCloudVAOs[i]);
+        glDrawArrays(GL_POINTS, 0, pointCloudVertexCounts[i]);
+    }
+
+    shader.setBool("uRenderingPoints", false);
+    for (size_t i = 0; i < miniHullVAOs.size(); ++i) {
+        glBindVertexArray(miniHullVAOs[i]);
+        glDrawArrays(GL_TRIANGLES, 0, miniHullVertexCounts[i]);
+    }
+    
+
+    glBindVertexArray(0);
+}
+
+void Renderer::ClearBuffers(){
+    miniHullVAOs.clear();
+    miniHullVBOs.clear();
+    miniHullVertexCounts.clear();
+}

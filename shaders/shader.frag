@@ -1,11 +1,22 @@
 #version 330 core
 out vec4 FragColor;
 
+uniform bool uRenderingPoints;
+
 void main() {
-    vec2 coord = gl_PointCoord * 2.0 - 1.0; // convert [0,1] → [-1,1]
-        if (dot(coord, coord) > 1.0) {
-            discard; // Outside unit circle → skip pixel
+    if (uRenderingPoints){
+        vec2 coord = gl_PointCoord * 2.0 - 1.0;
+        float distSquared = dot(coord,coord);
+
+        if (distSquared > 1.0){
+            discard;
         }
 
-    FragColor = vec4(0.2, 0.6, 0.8, 1.0);
+        FragColor = vec4(0.1, 0.1, 0.1, 0.4); // cor dos pontos
+    }
+
+    else {
+        FragColor = vec4(0.2, 0.2, 0.2, 0.4); // cor dos triângulos
+    }
+
 }

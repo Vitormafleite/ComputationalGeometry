@@ -5,15 +5,17 @@
 #include <iostream>
 #include <glm/glm.hpp>
 
+#include "Vector3.h"
+
 struct Vertex {
     int id;
-    int edgeId = -1; // One outgoing edge
+    int edgeId = -1;
     glm::vec3 position;
 };
 
 struct Face {
     int id;
-    int edgeId = -1; // One edge on the face boundary
+    int edgeId = -1;
 };
 
 struct WingedEdge {
@@ -42,6 +44,9 @@ public:
     int addEdge(int vStartId, int vEndId);
 
     int addFaceFromVertices(int a, int b, int c);
+
+    std::vector<glm::vec3> extractTriangleVertices() const;
+
     void debugPrint() const;
 
     void clear();
