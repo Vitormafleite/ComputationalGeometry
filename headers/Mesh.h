@@ -19,28 +19,25 @@
 
 class Mesh{
 public:
-    unsigned int VAO, VBO, EBO;
-
     Mesh();
 
     const std::vector<Vector3>& getVertices() const;
     const std::vector<unsigned int>& getIndices() const;
 
-    bool loadFromOBJ(const std::string& filepath);
     bool loadSubmeshFromOBJ(const std::string& filepath);
     void sortSubmeshes();
     void partitionSubmeshes();
     void buildPartitionConvexHulls();
     WingedEdgeMesh buildInitialHull(const std::vector<Vector3>& group);
 
-    void generateHullMergeSteps();
+    WingedEdgeMesh InitialHull(const std::vector<Vector3>& group);
 
-    void draw() const;
+    void generateHullMergeSteps();
 
     void ClearMeshData();
     
     std::vector<Vector3> vertices; // List all vertices 
-    std::vector<std::vector<Vector3>> submeshesVertices; // Divide vertices into submeshes according to the .obj folder // Usign this for renderign as well
+    std::vector<std::vector<Vector3>> submeshesVertices; // Divide vertices into submeshes according to the .obj folder // Using this for renderign as well
     std::vector<std::vector<std::vector<Vector3>>> partitions; // After ordering allong the x-axis, divide the submeshes into partitions
     std::vector<std::vector<WingedEdgeMesh>> localHulls;
 
@@ -49,10 +46,6 @@ public:
     
 private:
 
-
-
-    void setupMesh();
-    void setupSubmeshRender() ;
 };
 
 #endif //MESH_H

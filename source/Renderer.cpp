@@ -196,7 +196,112 @@ void Renderer::runMergeHull() {
     mesh_m.sortSubmeshes();
     mesh_m.partitionSubmeshes();
     mesh_m.buildPartitionConvexHulls();
+
+    mesh_m.localHulls[0][0].debugPrint();
+
     setupMiniHulls(mergeStep);
+}
+
+
+void Renderer::setupPointCloud(){
+    // Clean up old buffers
+    for (GLuint vao : pointCloudVAOs) {
+        glDeleteVertexArrays(1, &vao);
+    }
+    for (GLuint vbo : pointCloudVBOs) {
+        glDeleteBuffers(1, &vbo);
+    }
+    
+    pointCloudVAOs.clear();
+    pointCloudVBOs.clear();
+    
+    for (const auto& submesh : mesh_m.submeshesVertices) {
+        GLuint vao, vbo;
+        
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+        
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, submesh.size() * sizeof(Vector3), submesh.data(), GL_STATIC_DRAW);
+        
+        glEnableVertexAttribArray(0); 
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3), (void*)0);
+        
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+        
+        pointCloudVAOs.push_back(vao);
+        pointCloudVBOs.push_back(vbo);
+        pointCloudVertexCounts.push_back(static_cast<GLsizei>(submesh.size()));
+    }
+}
+
+void Renderer::setupMiniHulls(int step) {
+    // Cleanup anterior
+    for (GLuint vao : miniHullVAOs) glDeleteVertexArrays(1, &vao);
+    for (GLuint vbo : miniHullVBOs) glDeleteBuffers(1, &vbo);
+    
+    miniHullVAOs.clear();
+    miniHullVBOs.clear();
+    miniHullVertexCounts.clear();
+    
+    //IMPLEMENT STEP LOGIC FOR ANIMATION
+
+    for (const auto& meshGroup : mesh_m.localHulls) {
+        for (const auto& mesh : meshGroup) {
+            std::vector<glm::vec3> vertices = mesh.extractTriangleVertices();
+            if (vertices.empty()) continue;
+            
+            GLuint vao, vbo;
+            glGenVertexArrays(1, &vao);
+            glGenBuffers(1, &vbo);
+            
+            glBindVertexArray(vao);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), vertices.data(), GL_STATIC_DRAW);
+            
+            glEnableVertexAttribArray(0); // aPos
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+            
+            glBindVertexArray(0);
+            
+            miniHullVAOs.push_back(vao);
+            miniHullVBOs.push_back(vbo);
+            miniHullVertexCounts.push_back(static_cast<GLsizei>(vertices.size()));
+        }
+    }
+}
+
+void Renderer::renderGeometry() {
+    shader.use();
+    shader.setMat4("uModel", glm::mat4(1.0f));
+    shader.setMat4("uView", view);
+    shader.setMat4("uProjection", projection);
+    
+    shader.setBool("uRenderingPoints", true);
+    for (size_t i = 0; i < pointCloudVAOs.size(); ++i) {
+        glBindVertexArray(pointCloudVAOs[i]);
+        glDrawArrays(GL_POINTS, 0, pointCloudVertexCounts[i]);
+    }
+    
+    shader.setBool("uRenderingPoints", false);
+    for (size_t i = 0; i < miniHullVAOs.size(); ++i) {
+        glBindVertexArray(miniHullVAOs[i]);
+        glDrawArrays(GL_TRIANGLES, 0, miniHullVertexCounts[i]);
+    }
+    
+    
+    glBindVertexArray(0);
+}
+
+void Renderer::ClearBuffers(){
+    pointCloudVAOs.clear();
+    pointCloudVBOs.clear();
+    pointCloudVertexCounts.clear();
+    miniHullVAOs.clear();
+    miniHullVBOs.clear();
+    miniHullVertexCounts.clear();
 }
 
 void Renderer::handleCameraInput() {
@@ -247,103 +352,4 @@ void Renderer::handleCameraInput() {
 
     // Update the view matrix
     view = camera.getViewMatrix();
-}
-
-void Renderer::setupPointCloud(){
-    // Clean up old buffers
-    for (GLuint vao : pointCloudVAOs) {
-        glDeleteVertexArrays(1, &vao);
-    }
-    for (GLuint vbo : pointCloudVBOs) {
-        glDeleteBuffers(1, &vbo);
-    }
-
-    pointCloudVAOs.clear();
-    pointCloudVBOs.clear();
-
-    for (const auto& submesh : mesh_m.submeshesVertices) {
-        GLuint vao, vbo;
-
-        glGenVertexArrays(1, &vao);
-        glGenBuffers(1, &vbo);
-
-        glBindVertexArray(vao);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, submesh.size() * sizeof(Vector3), submesh.data(), GL_STATIC_DRAW);
-
-        glEnableVertexAttribArray(0); 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vector3), (void*)0);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-
-        pointCloudVAOs.push_back(vao);
-        pointCloudVBOs.push_back(vbo);
-        pointCloudVertexCounts.push_back(static_cast<GLsizei>(submesh.size()));
-    }
-}
-
-void Renderer::setupMiniHulls(int step) {
-    // Cleanup anterior
-    for (GLuint vao : miniHullVAOs) glDeleteVertexArrays(1, &vao);
-    for (GLuint vbo : miniHullVBOs) glDeleteBuffers(1, &vbo);
-
-    miniHullVAOs.clear();
-    miniHullVBOs.clear();
-    miniHullVertexCounts.clear();
-
-    for (const auto& meshGroup : mesh_m.localHulls) {
-        for (const auto& mesh : meshGroup) {
-            std::vector<glm::vec3> vertices = mesh.extractTriangleVertices();
-            if (vertices.empty()) continue;
-
-            GLuint vao, vbo;
-            glGenVertexArrays(1, &vao);
-            glGenBuffers(1, &vbo);
-
-            glBindVertexArray(vao);
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
-            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), vertices.data(), GL_STATIC_DRAW);
-
-            glEnableVertexAttribArray(0); // aPos
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
-
-            glBindVertexArray(0);
-
-            miniHullVAOs.push_back(vao);
-            miniHullVBOs.push_back(vbo);
-            miniHullVertexCounts.push_back(static_cast<GLsizei>(vertices.size()));
-        }
-    }
-}
-
-//GLint pointSizeLoc = glGetUniformLocation(shader.getID(), "uPointSize");
-//glUniform1f(pointSizeLoc, 1.0f);
-
-void Renderer::renderGeometry() {
-    shader.use();
-    shader.setMat4("uModel", glm::mat4(1.0f));
-    shader.setMat4("uView", view);
-    shader.setMat4("uProjection", projection);
-
-    shader.setBool("uRenderingPoints", true);
-    for (size_t i = 0; i < pointCloudVAOs.size(); ++i) {
-        glBindVertexArray(pointCloudVAOs[i]);
-        glDrawArrays(GL_POINTS, 0, pointCloudVertexCounts[i]);
-    }
-
-    shader.setBool("uRenderingPoints", false);
-    for (size_t i = 0; i < miniHullVAOs.size(); ++i) {
-        glBindVertexArray(miniHullVAOs[i]);
-        glDrawArrays(GL_TRIANGLES, 0, miniHullVertexCounts[i]);
-    }
-    
-
-    glBindVertexArray(0);
-}
-
-void Renderer::ClearBuffers(){
-    miniHullVAOs.clear();
-    miniHullVBOs.clear();
-    miniHullVertexCounts.clear();
 }

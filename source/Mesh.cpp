@@ -3,7 +3,7 @@
 #include <sstream>
 #include <iostream>
 
-Mesh::Mesh() : VAO(0), VBO(0), EBO(0) {}
+Mesh::Mesh(){}
 
 bool Mesh::loadSubmeshFromOBJ(const std::string& filepath) {
     std::ifstream file(filepath);
@@ -63,8 +63,6 @@ bool Mesh::loadSubmeshFromOBJ(const std::string& filepath) {
     }
 
     file.close();
-
-    //setupSubmeshRender();
     
     return true;
 }
@@ -151,14 +149,16 @@ void Mesh::buildPartitionConvexHulls() {
 WingedEdgeMesh Mesh::buildInitialHull(const std::vector<Vector3>& group) {
     WingedEdgeMesh hull;
     std::vector<int> vIds;
+    const float epsilon = 1e-6f;
 
-    for (const auto& pt : group) {
-        glm::vec3 gpt(pt.x, pt.y, pt.z);
+    std::cout << epsilon + 1 << std::endl;
+
+    for (const auto& point : group) {
+        glm::vec3 gpt(point.x, point.y, point.z);
         vIds.push_back(hull.addVertex(gpt));
     }
 
     if (group.size() == 4) {
-        const float epsilon = 1e-6f;
 
         for (int i = 0; i < 4; ++i) {
             int a = (i + 1) % 4;
@@ -182,7 +182,6 @@ WingedEdgeMesh Mesh::buildInitialHull(const std::vector<Vector3>& group) {
         }
     }
     else if (group.size() == 5) {
-        const float epsilon = 1e-6f;
         std::set<std::tuple<int, int, int>> uniqueFaces;
 
         for (int i = 0; i < 5; ++i) {
@@ -220,11 +219,79 @@ WingedEdgeMesh Mesh::buildInitialHull(const std::vector<Vector3>& group) {
     return hull;
 }
 
-void Mesh::draw() const {
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
+WingedEdgeMesh Mesh::InitialHull(const std::vector<Vector3>& group) {
+
+    WingedEdgeMesh hull;
+    std::vector<int> vIds;
+
+    const float epsilon = 1e-6f;
+
+    for (const auto& point : group) {
+        //converting to glm because why not
+        glm::vec3 glmPoint(point.x, point.y, point.z);
+        vIds.push_back(hull.addVertex(glmPoint));
+    }
+
+    if (group.size() == 4) {
+
+        glm::vec3 pointA(group[1].x, group[1].y, group[1].z);
+        glm::vec3 pointB(group[2].x, group[2].y, group[2].z);
+        glm::vec3 pointC(group[3].x, group[3].y, group[3].z);
+        glm::vec3 triangleNormal = glm::normalize(glm::cross(pointB - pointA, pointC - pointA));
+
+        glm::vec3 pointToCheckFaceOrientation(group[0].x, group[0].y, group[0].z);
+        float d = glm::dot(pointToCheckFaceOrientation - pointA, triangleNormal);
+
+        if (d > epsilon) {
+            hull.addFaceFromVertices(vIds[1], vIds[3], vIds[2]);//FIX THIS TO ADD EDGE TO QUEUE AND TO ADAPT TO THE NEW EDGE IMPLEMENTATION
+        } else {
+            hull.addFaceFromVertices(vIds[1], vIds[2], vIds[3]);
+        }
+
+        while(hull.openEdgesIDQueue.size() > 0){
+            
+        }
+    }
+    else if (group.size() == 5) {
+
+        std::set<std::tuple<int, int, int>> uniqueFaces;
+
+        for (int i = 0; i < 5; ++i) {
+            for (int j = i + 1; j < 5; ++j) {
+                for (int k = j + 1; k < 5; ++k) {
+                    glm::vec3 A(group[i].x, group[i].y, group[i].z);
+                    glm::vec3 B(group[j].x, group[j].y, group[j].z);
+                    glm::vec3 C(group[k].x, group[k].y, group[k].z);
+                    glm::vec3 N = glm::normalize(glm::cross(B - A, C - A));
+                    if (glm::length(N) < epsilon) continue;
+
+                    bool allNeg = true, allPos = true;
+                    for (int l = 0; l < 5; ++l) {
+                        if (l == i || l == j || l == k) continue;
+                        glm::vec3 T(group[l].x, group[l].y, group[l].z);
+                        float dot = glm::dot(T - A, N);
+                        allNeg &= (dot < -epsilon);
+                        allPos &= (dot > epsilon);
+                    }
+
+                    if (allNeg || allPos) {
+                        int a = vIds[i], b = vIds[j], c = vIds[k];
+                        if (allNeg) std::swap(b, c);
+                        auto sorted = std::minmax({a, b, c});
+                        auto key = std::make_tuple(sorted.first, sorted.second, a + b + c - sorted.first - sorted.second);
+                        if (uniqueFaces.insert(key).second) {
+                            hull.addFaceFromVertices(a, b, c);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return hull;
 }
+
+
 
 const std::vector<Vector3>& Mesh::getVertices() const { return vertices; }
 const std::vector<unsigned int>& Mesh::getIndices() const { return indices; }
