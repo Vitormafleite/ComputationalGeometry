@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 cmake_policy(SET CMP0072 NEW)  # Use GLVND
 set(OpenGL_GL_PREFERENCE GLVND)
 
-
+find_package(Fontconfig REQUIRED)
 
 # Find packages
 find_package(OpenGL REQUIRED)
@@ -52,7 +52,9 @@ add_executable(${PROJECT_NAME}
 )
 
 # Link OpenGL and GLFW
+
 target_link_libraries(${PROJECT_NAME}
+    PRIVATE Fontconfig::Fontconfig
     OpenGL::GL
     glfw
 )

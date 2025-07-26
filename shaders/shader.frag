@@ -12,7 +12,7 @@ void main() {
             discard;
         }
 
-        FragColor = vec4(0.1, 0.1, 0.1, 0.4); // cor dos pontos
+        FragColor = vec4(0.1, 0.1, 0.1, 1.0); // cor dos pontos
     }
 
     else {

@@ -34,9 +34,15 @@ bool Renderer::init(int width, int height, const char* title) {
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
 
+    // Enable face culling and set CCW as front face
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK); // Cull back faces
+    glFrontFace(GL_CCW); // Counter-clockwise winding is front face
+    
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -154,12 +160,18 @@ void Renderer::endFrame() {
 
 void Renderer::shutdown() {
     if (window) {
+        glfwMakeContextCurrent(window);
+        
+        shader.cleanup();
+        ClearBuffers();
+
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
+
         glfwDestroyWindow(window);
-        glfwTerminate();
         window = nullptr;
+        glfwTerminate();
     }
 }
 
@@ -251,6 +263,7 @@ void Renderer::setupMiniHulls(int step) {
     for (const auto& meshGroup : mesh_m.localHulls) {
         for (const auto& mesh : meshGroup) {
             std::vector<glm::vec3> vertices = mesh.extractTriangleVertices();
+            std::cout << vertices.size() << std::endl;
             if (vertices.empty()) continue;
             
             GLuint vao, vbo;
@@ -285,17 +298,36 @@ void Renderer::renderGeometry() {
         glDrawArrays(GL_POINTS, 0, pointCloudVertexCounts[i]);
     }
     
+    glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
+
     shader.setBool("uRenderingPoints", false);
     for (size_t i = 0; i < miniHullVAOs.size(); ++i) {
         glBindVertexArray(miniHullVAOs[i]);
         glDrawArrays(GL_TRIANGLES, 0, miniHullVertexCounts[i]);
     }
-    
+    //add diferent GL_line for better geometry visuals
+    //add XZ-plane grid for better visualization
     
     glBindVertexArray(0);
 }
 
 void Renderer::ClearBuffers(){
+    // Delete point cloud buffers
+    for (GLuint vao : pointCloudVAOs) {
+        glDeleteVertexArrays(1, &vao);
+    }
+    for (GLuint vbo : pointCloudVBOs) {
+        glDeleteBuffers(1, &vbo);
+    }
+    
+    // Delete mini hull buffers
+    for (GLuint vao : miniHullVAOs) {
+        glDeleteVertexArrays(1, &vao);
+    }
+    for (GLuint vbo : miniHullVBOs) {
+        glDeleteBuffers(1, &vbo);
+    }
+
     pointCloudVAOs.clear();
     pointCloudVBOs.clear();
     pointCloudVertexCounts.clear();

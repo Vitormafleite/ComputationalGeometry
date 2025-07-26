@@ -6,104 +6,196 @@ int WingedEdgeMesh::addVertex(const glm::vec3& pos) {
     return id;
 }
 
-int WingedEdgeMesh::addEdge(int vStartId, int vEndId) {
-    int id = static_cast<int>(edges.size());
-    edges.push_back(WingedEdge{
-        id,
-        vStartId,
-        vEndId,
-        -1, -1, // fLeftId, fRightId
-        -1, -1, // eLeftPrevId, eLeftNextId
-        -1, -1  // eRightPrevId, eRightNextId
-    });
 
-    // Update vertex to reference one of its edges
-    if (vertices[vStartId].edgeId == -1) {
-        vertices[vStartId].edgeId = id;
-    }
+int WingedEdgeMesh::checkHowManyEdgesTriangleRemovesFromQueue(int vertexA, int vertexB, int vertexC){
+    int edgesTableHighestID = edges.size() - 1;
 
-    return id;
-}
+    int edgeABID, edgeBCID, edgeCAID;
+    int edgesFoundCounter = 0;
 
-int WingedEdgeMesh::addFaceFromVertices(int a, int b, int c) {
-    int faceId = static_cast<int>(faces.size());
-    Face face;
-    face.id = faceId;
-    faces.push_back(face);
+    //REFACTOR THIS BS LATER CAUSE ITS THE SAME FOR THE 3 EDGES, NO TIME RIGHT NOW
+    int edgeTableIndex = 0;
 
-    // Create the three edges for triangle face
-    int e0Id = static_cast<int>(edges.size());
-    int e1Id = e0Id + 1;
-    int e2Id = e0Id + 2;
+    bool foundEdgeAB = false;
+    bool foundEdgeBC = false;
+    bool foundEdgeCA = false;
+    while(edgeTableIndex < this->edges.size()){
 
-    WingedEdge e0{e0Id, a, b, faceId}; // a->b
-    WingedEdge e1{e1Id, b, c, faceId}; // b->c
-    WingedEdge e2{e2Id, c, a, faceId}; // c->a
+        if(foundEdgeAB && foundEdgeBC && foundEdgeCA)
+            break;
 
-    // Set next/prev on the left (face side)
-    e0.eLeftNextId = e1Id;
-    e1.eLeftNextId = e2Id;
-    e2.eLeftNextId = e0Id;
-
-    e0.eLeftPrevId = e2Id;
-    e1.eLeftPrevId = e0Id;
-    e2.eLeftPrevId = e1Id;
-
-    // Add to edge list
-    edges.push_back(e0);
-    edges.push_back(e1);
-    edges.push_back(e2);
-
-    // Update face to point to one of its edges
-    faces[faceId].edgeId = e0Id;
-
-    // Optional: point vertices to one of their outgoing edges
-    if (vertices[a].edgeId == -1) vertices[a].edgeId = e0Id;
-    if (vertices[b].edgeId == -1) vertices[b].edgeId = e1Id;
-    if (vertices[c].edgeId == -1) vertices[c].edgeId = e2Id;
-
-    // === Twin linking ===
-    for (int i = e0Id; i <= e2Id; ++i) {
-        WingedEdge& e = edges[i];
-        for (int j = 0; j < edges.size(); ++j) {
-            if (i == j) continue;
-            WingedEdge& candidate = edges[j];
-            if (e.vStartId == candidate.vEndId && e.vEndId == candidate.vStartId) {
-                e.fRightId = candidate.fLeftId;
-                e.eRightNextId = candidate.eLeftPrevId;
-                e.eRightPrevId = candidate.eLeftNextId;
-                candidate.fRightId = e.fLeftId;
-                candidate.eRightNextId = e.eLeftPrevId;
-                candidate.eRightPrevId = e.eLeftNextId;
-                break;
+        if(!foundEdgeAB){
+            if ((edges[edgeTableIndex].vStartId == vertexA or edges[edgeTableIndex].vStartId == vertexB) && (edges[edgeTableIndex].vEndId == vertexA or edges[edgeTableIndex].vEndId == vertexB)){
+                foundEdgeAB = true;
+                edgesFoundCounter++;
             }
         }
+
+        if(!foundEdgeBC){
+            if ((edges[edgeTableIndex].vStartId == vertexB or edges[edgeTableIndex].vStartId == vertexC) && (edges[edgeTableIndex].vEndId == vertexB or edges[edgeTableIndex].vEndId == vertexC)){
+                foundEdgeBC = true;
+                edgesFoundCounter++;
+            }
+        }
+
+        if(!foundEdgeCA){
+            if ((edges[edgeTableIndex].vStartId == vertexC or edges[edgeTableIndex].vStartId == vertexA) && (edges[edgeTableIndex].vEndId == vertexC or edges[edgeTableIndex].vEndId == vertexA)){
+                foundEdgeCA = true;
+                edgesFoundCounter++;
+            }
+        }
+
+        edgeTableIndex++;
     }
 
-    return faceId;
+    return edgesFoundCounter;
+
+}
+
+int WingedEdgeMesh::addFaceFromVertices(int vertexA, int vertexB, int vertexC) {
+    int edgesTableHighestID = edges.size() - 1;
+
+    int edgeABID, edgeBCID, edgeCAID;
+
+    //REFACTOR THIS BS LATER CAUSE ITS THE SAME FOR THE 3 EDGES, NO TIME RIGHT NOW
+    int edgeTableIndex = 0;
+    bool foundEdgeAB = false;
+    bool foundEdgeBC = false;
+    bool foundEdgeCA = false;
+    while(edgeTableIndex < this->edges.size()){
+
+        if(foundEdgeAB && foundEdgeBC && foundEdgeCA)
+            break;
+
+        if(!foundEdgeAB){
+            if ((edges[edgeTableIndex].vStartId == vertexA or edges[edgeTableIndex].vStartId == vertexB) && (edges[edgeTableIndex].vEndId == vertexA or edges[edgeTableIndex].vEndId == vertexB)){
+                edgeABID = edgeTableIndex;
+                foundEdgeAB = true;
+                openEdgesQueue.erase(std::remove(openEdgesQueue.begin(), openEdgesQueue.end(), edgeABID), openEdgesQueue.end());
+            }
+        }
+
+        if(!foundEdgeBC){
+            if ((edges[edgeTableIndex].vStartId == vertexB or edges[edgeTableIndex].vStartId == vertexC) && (edges[edgeTableIndex].vEndId == vertexB or edges[edgeTableIndex].vEndId == vertexC)){
+                edgeBCID = edgeTableIndex;
+                foundEdgeBC = true;
+                openEdgesQueue.erase(std::remove(openEdgesQueue.begin(), openEdgesQueue.end(), edgeBCID), openEdgesQueue.end());
+            }
+        }
+
+        if(!foundEdgeCA){
+            if ((edges[edgeTableIndex].vStartId == vertexC or edges[edgeTableIndex].vStartId == vertexA) && (edges[edgeTableIndex].vEndId == vertexC or edges[edgeTableIndex].vEndId == vertexA)){
+                edgeCAID = edgeTableIndex;
+                foundEdgeCA = true;
+                openEdgesQueue.erase(std::remove(openEdgesQueue.begin(), openEdgesQueue.end(), edgeCAID), openEdgesQueue.end());
+            }
+        }
+
+        edgeTableIndex++;
+    }
+
+    if(!foundEdgeAB){
+        edgeABID = edges.size();
+        WingedEdge edgeAB = WingedEdge(edgeABID, vertexA, vertexB);
+        edges.push_back(edgeAB);
+        openEdgesQueue.push_back(edgeABID);
+    }
+
+    if(!foundEdgeBC){
+        edgeBCID = edges.size();
+        WingedEdge edgeBC = WingedEdge(edgeBCID, vertexB, vertexC);
+        edges.push_back(edgeBC);
+        openEdgesQueue.push_back(edgeBCID);
+    }
+
+    if(!foundEdgeCA){
+        edgeCAID = edges.size();
+        WingedEdge edgeCA = WingedEdge(edgeCAID, vertexC, vertexA);
+        edges.push_back(edgeCA);
+        openEdgesQueue.push_back(edgeCAID);
+    }
+
+    glm::vec3 faceNormal = glm::normalize(glm::cross(vertices[vertexB].position - vertices[vertexA].position, vertices[vertexC].position - vertices[vertexA].position));
+    Face newFace = Face(faces.size(), edgeABID, faceNormal);// use edge AB as standard, can change if needed
+    faces.push_back(newFace);
+
+    if(edgeABID > edgesTableHighestID){
+        edges[edgeABID].eLeftNextId = edgeBCID;
+        edges[edgeABID].eLeftPrevId = edgeCAID;
+        edges[edgeABID].fLeftId = newFace.id;
+    }
+
+    else{
+        edges[edgeABID].eRightNextId = edgeCAID;
+        edges[edgeABID].eRightPrevId = edgeBCID;
+        edges[edgeABID].fRightId = newFace.id;
+    }
+
+    if(edgeBCID > edgesTableHighestID){
+        edges[edgeBCID].eLeftNextId = edgeCAID;
+        edges[edgeBCID].eLeftPrevId = edgeABID;
+        edges[edgeBCID].fLeftId = newFace.id;
+    }
+
+    else{
+        edges[edgeBCID].eRightNextId = edgeCAID;
+        edges[edgeBCID].eRightPrevId = edgeBCID;
+        edges[edgeBCID].fRightId = newFace.id;
+    }
+
+    if(edgeCAID > edgesTableHighestID){
+        edges[edgeCAID].eLeftNextId = edgeABID;
+        edges[edgeCAID].eLeftPrevId = edgeBCID;
+        edges[edgeCAID].fLeftId = newFace.id;
+    }
+
+    else{
+        edges[edgeCAID].eRightNextId = edgeCAID;
+        edges[edgeCAID].eRightPrevId = edgeBCID;
+        edges[edgeCAID].fRightId = newFace.id;
+    }
+
+    if (vertices[vertexA].edgeId == -1) vertices[vertexA].edgeId = edgeABID;
+    if (vertices[vertexB].edgeId == -1) vertices[vertexB].edgeId = edgeBCID;
+    if (vertices[vertexC].edgeId == -1) vertices[vertexC].edgeId = edgeCAID;
+
+    return newFace.id;
 }
 
 std::vector<glm::vec3> WingedEdgeMesh::extractTriangleVertices() const {
     std::vector<glm::vec3> triangles;
+    std::vector<int> vertexIds;
 
     for (const auto& face : faces) {
         int startEdgeId = face.edgeId;
-        const WingedEdge* startEdge = &edges[startEdgeId];
 
-        std::vector<int> vertexIds;
-        const WingedEdge* e = startEdge;
-        do {
-            vertexIds.push_back(e->vStartId);
-            e = &edges[e->eLeftNextId];
-        } while (e != startEdge && vertexIds.size() < 10); // avoid infinite loop
+        
+        if (edges[startEdgeId].fLeftId == face.id){
 
-        if (vertexIds.size() >= 3) {
-            for (size_t i = 1; i + 1 < vertexIds.size(); ++i) {
-                triangles.push_back(vertices[vertexIds[0]].position);
-                triangles.push_back(vertices[vertexIds[i]].position);
-                triangles.push_back(vertices[vertexIds[i + 1]].position);
-            }
+            vertexIds.push_back(edges[startEdgeId].vStartId);
+            vertexIds.push_back(edges[startEdgeId].vEndId);
+            
+            if (edges[edges[startEdgeId].eLeftNextId].vEndId == vertexIds[vertexIds.size()-1] || edges[edges[startEdgeId].eLeftNextId].vEndId == vertexIds[vertexIds.size()-1])
+                vertexIds.push_back(edges[edges[startEdgeId].eLeftNextId].vStartId);
+            else
+                vertexIds.push_back(edges[edges[startEdgeId].eLeftNextId].vEndId);
         }
+
+        else {
+
+            vertexIds.push_back(edges[startEdgeId].vEndId);
+            vertexIds.push_back(edges[startEdgeId].vStartId);
+
+            if (edges[edges[startEdgeId].eRightNextId].vEndId == vertexIds[vertexIds.size()-1] || edges[edges[startEdgeId].eRightNextId].vEndId == vertexIds[vertexIds.size()-2])
+                vertexIds.push_back(edges[edges[startEdgeId].eRightNextId].vStartId);
+            else
+                vertexIds.push_back(edges[edges[startEdgeId].eRightNextId].vEndId);
+        }
+
+        //add the last three points
+        triangles.push_back(vertices[vertexIds[vertexIds.size()-3]].position);
+        triangles.push_back(vertices[vertexIds[vertexIds.size()-2]].position);
+        triangles.push_back(vertices[vertexIds[vertexIds.size()-1]].position);
     }
 
     return triangles;
@@ -121,7 +213,8 @@ void WingedEdgeMesh::debugPrint() const {
 
     std::cout << "\n=== Faces ===\n";
     for (const auto& f : faces) {
-        std::cout << "Face " << f.id << ", EdgeId: " << f.edgeId << '\n';
+        std::cout << "Face " << f.id << ", EdgeId: " << f.edgeId << ", faceNormal: (" 
+                  << f.faceNormal.x << ", " << f.faceNormal.y << ", " << f.faceNormal.z << ") " <<'\n';
     }
 
     std::cout << "\n=== Edges ===\n";

@@ -50,6 +50,9 @@ private:
     std::vector<GLuint> miniHullVAOs;
     std::vector<GLuint> miniHullVBOs;
     std::vector<GLsizei> miniHullVertexCounts;
+
+    GLuint gridVAO = 0;
+    GLuint gridVBO = 0;
     
     //Animate the merge process
     int mergeStep = 0;

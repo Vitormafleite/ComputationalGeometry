@@ -18,6 +18,8 @@ public:
     void setMat4(const std::string& name, const glm::mat4& mat) const;
     void setBool(const std::string& name, bool boolean) const;
 
+    void cleanup();
+
 private:
     GLuint ID;
     bool compileShader(const std::string& source, GLenum type, GLuint& shaderID);

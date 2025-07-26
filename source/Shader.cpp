@@ -102,3 +102,10 @@ void Shader::setMat4(const std::string& name, const glm::mat4& mat) const {
 void Shader::setBool(const std::string& name, bool boolean) const {
     glUniform1i(glGetUniformLocation(ID, name.c_str()), (int)boolean);
 }
+
+void Shader::cleanup(){
+    if (ID != 0) {
+        glDeleteProgram(ID);
+        ID = 0;
+    }
+}
