@@ -202,7 +202,8 @@ WingedEdgeMesh Mesh::InitialHull(const std::vector<Vector3>& group) {
 
     }
 
-    else {
+    //ONLY WORKS FOR CASE 5, NEED TO FIX FOR CASE 6 - 7 - 11
+    else if (group.size() == 5) {
         bool foundValidFace = false;
         for (int i = 0; i < 5 && !foundValidFace; ++i) {
             for (int j = i + 1; j < 5 && !foundValidFace; ++j) {
