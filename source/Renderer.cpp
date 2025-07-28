@@ -122,14 +122,15 @@ void Renderer::loadUIElements() {
     if (ImGui::Button("Previous Merge Step")) {
         if(mergeStep > 0){
             mergeStep--;
-            //setup the Vaos and Vbos Again
+            setupMiniHulls(mergeStep);
         }
     }
     
     if (ImGui::Button("Next Merge Step")) {
-        mergeStep++;
-        //setup the Vaos and Vbos Again
-        //also add condition so we cant go further then the last merge step
+        if(mergeStep < maxMergeStep){
+            mergeStep++;
+            setupMiniHulls(mergeStep);
+        }
     }
 
     ImGui::End();
@@ -209,9 +210,12 @@ void Renderer::runMergeHull() {
     mesh_m.partitionSubmeshes();
     mesh_m.buildPartitionConvexHulls();
 
-    mesh_m.localHulls[0][0].debugPrint();
+    mesh_m.MergeHull();
 
-    setupMiniHulls(mergeStep);
+    maxMergeStep = mesh_m.mergeHullPartitionsColections.size() - 1;
+
+    setupMiniHulls(0);
+    mergeStep = 0;
 }
 
 
@@ -260,10 +264,9 @@ void Renderer::setupMiniHulls(int step) {
     
     //IMPLEMENT STEP LOGIC FOR ANIMATION
 
-    for (const auto& meshGroup : mesh_m.localHulls) {
+    for (const auto& meshGroup : mesh_m.mergeHullPartitionsColections[step]) {
         for (const auto& mesh : meshGroup) {
-            std::vector<glm::vec3> vertices = mesh.extractTriangleVertices();
-            std::cout << vertices.size() << std::endl;
+            std::vector<glm::vec3> vertices = mesh.ExtractTriangleVertices();
             if (vertices.empty()) continue;
             
             GLuint vao, vbo;

@@ -28,11 +28,15 @@ public:
     void sortSubmeshes();
     void partitionSubmeshes();
     void buildPartitionConvexHulls();
-    WingedEdgeMesh buildInitialHull(const std::vector<Vector3>& group);
 
     WingedEdgeMesh InitialHull(const std::vector<Vector3>& group);
 
-    void generateHullMergeSteps();
+    bool FaceSeeOtherHull(glm::vec3 faceNormal, glm::vec3 faceVertex, std::vector<glm::vec3> otherHullVertices);
+
+    void MergeHull();
+
+    WingedEdgeMesh MergeTwoHulls(WingedEdgeMesh leftHull, WingedEdgeMesh rightHull);
+    WingedEdgeMesh LinkHulls(WingedEdgeMesh leftHull, WingedEdgeMesh rightHull);
 
     void ClearMeshData();
     
@@ -40,8 +44,8 @@ public:
     std::vector<std::vector<Vector3>> submeshesVertices; // Divide vertices into submeshes according to the .obj folder // Using this for renderign as well
     std::vector<std::vector<std::vector<Vector3>>> partitions; // After ordering allong the x-axis, divide the submeshes into partitions
     std::vector<std::vector<WingedEdgeMesh>> localHulls;
-
-    std::vector<std::vector<std::vector<WingedEdgeMesh>>> hullsSteps;
+    
+    std::vector<std::vector<std::vector<WingedEdgeMesh>>> mergeHullPartitionsColections;
     std::vector<unsigned int> indices;
     
 private:

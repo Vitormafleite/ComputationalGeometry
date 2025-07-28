@@ -1,13 +1,13 @@
 #include "../headers/WingedEdgeMesh.h"
 
-int WingedEdgeMesh::addVertex(const glm::vec3& pos) {
+int WingedEdgeMesh::AddVertex(const glm::vec3& pos) {
     int id = static_cast<int>(vertices.size());
     vertices.push_back(Vertex{ id, -1, pos });
     return id;
 }
 
 
-int WingedEdgeMesh::checkHowManyEdgesTriangleRemovesFromQueue(int vertexA, int vertexB, int vertexC){
+int WingedEdgeMesh::CheckHowManyEdgesTriangleRemovesFromQueue(int vertexA, int vertexB, int vertexC){
     int edgesTableHighestID = edges.size() - 1;
 
     int edgeABID, edgeBCID, edgeCAID;
@@ -52,7 +52,7 @@ int WingedEdgeMesh::checkHowManyEdgesTriangleRemovesFromQueue(int vertexA, int v
 
 }
 
-int WingedEdgeMesh::addFaceFromVertices(int vertexA, int vertexB, int vertexC) {
+void WingedEdgeMesh::AddFaceFromVertices(int vertexA, int vertexB, int vertexC) {
     int edgesTableHighestID = edges.size() - 1;
 
     int edgeABID, edgeBCID, edgeCAID;
@@ -158,11 +158,303 @@ int WingedEdgeMesh::addFaceFromVertices(int vertexA, int vertexB, int vertexC) {
     if (vertices[vertexA].edgeId == -1) vertices[vertexA].edgeId = edgeABID;
     if (vertices[vertexB].edgeId == -1) vertices[vertexB].edgeId = edgeBCID;
     if (vertices[vertexC].edgeId == -1) vertices[vertexC].edgeId = edgeCAID;
-
-    return newFace.id;
 }
 
-std::vector<glm::vec3> WingedEdgeMesh::extractTriangleVertices() const {
+
+std::vector<glm::vec3> WingedEdgeMesh::ExtractVerticesPositions(){
+    std::vector<glm::vec3> verticesCoordinates;
+
+    for (int i = 0; i < vertices.size(); i++){
+        verticesCoordinates.push_back(vertices[i].position);
+    }
+
+    return verticesCoordinates;
+}
+
+void WingedEdgeMesh::DeleteFace(int faceID){
+    int mainEdgeID = faces[faceID].edgeId;
+    int forwardEdgeID, backwardEdgeID;
+    bool isLeftFaceMainEdge, isLeftFaceForwardEdge, isLeftFaceBackwardEdge;
+
+    if(edges[mainEdgeID].fLeftId == faceID){
+        forwardEdgeID = edges[mainEdgeID].eLeftNextId;
+        backwardEdgeID = edges[mainEdgeID].eLeftPrevId;
+        isLeftFaceMainEdge = true;
+    }
+
+    else {
+        forwardEdgeID = edges[mainEdgeID].eRightNextId;
+        backwardEdgeID = edges[mainEdgeID].eRightPrevId;
+        isLeftFaceMainEdge = false;
+    }
+
+    if(edges[forwardEdgeID].fLeftId == faceID)  
+        isLeftFaceForwardEdge = true;
+    else
+        isLeftFaceForwardEdge = false;
+
+    if(edges[backwardEdgeID].fLeftId == faceID)  
+        isLeftFaceBackwardEdge = true;
+    else
+        isLeftFaceBackwardEdge = false;
+
+    DeleteFaceFromEdge(faceID, mainEdgeID, isLeftFaceMainEdge);
+    DeleteFaceFromEdge(faceID, forwardEdgeID, isLeftFaceForwardEdge);
+    DeleteFaceFromEdge(faceID, backwardEdgeID, isLeftFaceBackwardEdge);
+
+    faces[faceID].edgeId = -1;
+    faces[faceID].id = -1;
+    faces[faceID].faceNormal = glm::vec3(0,0,0);
+}
+
+void WingedEdgeMesh::DeleteFaceFromEdge(int faceID, int edgeID, bool isLeftFace){
+    if (isLeftFace){
+        edges[edgeID].eLeftNextId = -1;
+        edges[edgeID].eLeftPrevId = -1;
+        edges[edgeID].fLeftId = -1;
+
+        if(edges[edgeID].fRightId == -1){
+            if(vertices[edges[edgeID].vEndId].edgeId == edgeID)
+                vertices[edges[edgeID].vEndId].edgeId = -1;
+            else if (vertices[edges[edgeID].vStartId].edgeId == edgeID)
+                vertices[edges[edgeID].vStartId].edgeId = -1;
+            
+            edges[edgeID].vStartId = -1;
+            edges[edgeID].vEndId = -1;
+            edges[edgeID].id = -1;
+
+            openEdgesQueue.erase(std::remove(openEdgesQueue.begin(), openEdgesQueue.end(), edgeID), openEdgesQueue.end());
+        }
+
+        else {
+            openEdgesQueue.push_back(edgeID);
+        }
+    }
+
+    else{
+        edges[edgeID].eRightNextId = -1;
+        edges[edgeID].eRightPrevId = -1;
+        edges[edgeID].fRightId = -1;
+
+        if(edges[edgeID].fLeftId == -1){
+            if(vertices[edges[edgeID].vEndId].edgeId == edgeID)
+                vertices[edges[edgeID].vEndId].edgeId = -1;
+            else if (vertices[edges[edgeID].vStartId].edgeId == edgeID)
+                vertices[edges[edgeID].vStartId].edgeId = -1;
+            
+            edges[edgeID].vStartId = -1;
+            edges[edgeID].vEndId = -1;
+            edges[edgeID].id = -1;
+
+            openEdgesQueue.erase(std::remove(openEdgesQueue.begin(), openEdgesQueue.end(), edgeID), openEdgesQueue.end());
+        }
+
+        else {
+            openEdgesQueue.push_back(edgeID);
+        }
+    }
+}
+
+void WingedEdgeMesh::FixMeshAfterDeletions(){
+    std::vector<int> deletedFaces, deletedEdges;
+
+    for (int faceId = 0; faceId < faces.size(); faceId++){
+        if (faces[faceId].id == -1){
+            deletedFaces.push_back(faceId);
+        }
+    }
+
+    for (int edgeId = 0; edgeId < edges.size(); edgeId++){
+        if (edges[edgeId].id == -1){
+            deletedEdges.push_back(edgeId);
+        }
+    }
+
+    int currentDeletedTopFace;
+    for(int i = deletedFaces.size() - 1; i >=0; i--){
+        currentDeletedTopFace = deletedFaces[i];
+
+        faces.erase(faces.begin() + currentDeletedTopFace);
+
+        for (int faceIndex = faces.size() - 1; faceIndex >= 0; faceIndex--){
+            if(faces[faceIndex].id > currentDeletedTopFace){
+                faces[faceIndex].id--;
+            }
+            else{
+                break;
+            }
+        }
+
+        for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++){
+            if(edges[edgeIndex].fLeftId > currentDeletedTopFace){
+                edges[edgeIndex].fLeftId--;
+            }
+            if(edges[edgeIndex].fRightId > currentDeletedTopFace){
+                edges[edgeIndex].fRightId--;
+            } 
+        }
+
+    }
+
+    int currentDeletedTopEdge;
+    for (int i = deletedEdges.size() - 1; i >= 0; i--){
+        currentDeletedTopEdge = deletedEdges[i];
+
+        edges.erase(edges.begin() + currentDeletedTopEdge);
+
+        for (int edgeIndex = edges.size() - 1; edgeIndex >= 0; edgeIndex--){
+            if(edges[edgeIndex].id > currentDeletedTopEdge){
+                edges[edgeIndex].id--;
+            }
+            if(edges[edgeIndex].eLeftNextId > currentDeletedTopEdge){
+                edges[edgeIndex].eLeftNextId--;
+            }
+            if(edges[edgeIndex].eRightNextId > currentDeletedTopEdge){
+                edges[edgeIndex].eRightNextId--;
+            }
+            if(edges[edgeIndex].eLeftPrevId > currentDeletedTopEdge){
+                edges[edgeIndex].eLeftPrevId--;
+            }
+            if(edges[edgeIndex].eRightPrevId > currentDeletedTopEdge){
+                edges[edgeIndex].eRightPrevId--;
+            }
+        }
+
+        for (int faceIndex = 0; faceIndex < faces.size(); faceIndex++){
+            if(faces[faceIndex].edgeId > currentDeletedTopEdge)
+                faces[faceIndex].edgeId--;
+        }
+
+        for (int vertexIndex = 0; vertexIndex < vertices.size(); vertexIndex++){
+            if(vertices[vertexIndex].edgeId > currentDeletedTopEdge)
+                vertices[vertexIndex].edgeId--;
+        }
+
+        for (int i = 0; i < openEdgesQueue.size(); i++){
+            if(openEdgesQueue[i] > currentDeletedTopEdge)
+                openEdgesQueue[i]--;
+        }
+
+    }
+
+}
+
+void WingedEdgeMesh::AppendDataToLinkHulls(int verticesAmount, int edgesAmount, int facesAmount){
+
+    for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++){
+            edges[edgeIndex].id += edgesAmount;
+            edges[edgeIndex].eLeftNextId += edgesAmount;
+            edges[edgeIndex].eLeftPrevId += edgesAmount;
+            edges[edgeIndex].eRightNextId += edgesAmount;
+            edges[edgeIndex].eRightPrevId += edgesAmount;
+            edges[edgeIndex].vEndId += verticesAmount;
+            edges[edgeIndex].vStartId += verticesAmount;
+            edges[edgeIndex].fLeftId += facesAmount;
+            edges[edgeIndex].fRightId += facesAmount;
+        }
+
+        for (int faceIndex = 0; faceIndex < faces.size(); faceIndex++){
+            faces[faceIndex].edgeId += edgesAmount;
+            faces[faceIndex].id += facesAmount;
+        }
+
+        for (int vertexIndex = 0; vertexIndex < vertices.size(); vertexIndex++){
+            vertices[vertexIndex].edgeId += edgesAmount;
+            vertices[vertexIndex].id += verticesAmount;
+        }
+
+        for (int i = 0; i < openEdgesQueue.size(); i++){
+            openEdgesQueue[i]+=edgesAmount;
+        }
+}
+
+void WingedEdgeMesh::AddFirstMergingEdge(){
+    int lowestLeftHullVertexY, lowestRightHullVertexY, lowestLeftHullVertexYIndex, lowestRightHullVertexYIndex;
+    int leftHullEdgeOrigin, rightHullEdgeOrigin;
+
+    //CAN IMPROVE TO CHECK POINTS ONLY ONCE, DOING IT LAZY NOW AND CHECKING TWICE
+    for(int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
+        if (i == 0){
+            if (vertices[edges[leftHullOpenEdgesQueue[i]].vStartId].position.y < vertices[edges[leftHullOpenEdgesQueue[i]].vEndId].position.y){
+                lowestLeftHullVertexY = vertices[edges[leftHullOpenEdgesQueue[i]].vStartId].position.y;
+                lowestLeftHullVertexYIndex = edges[leftHullOpenEdgesQueue[i]].vStartId;
+                leftHullEdgeOrigin = leftHullOpenEdgesQueue[i];
+            }
+
+            else{
+                lowestLeftHullVertexY = vertices[edges[leftHullOpenEdgesQueue[i]].vEndId].position.y;
+                lowestLeftHullVertexYIndex = edges[leftHullOpenEdgesQueue[i]].vEndId;
+                leftHullEdgeOrigin = leftHullOpenEdgesQueue[i];
+            }
+        }
+
+        else{
+            if (vertices[edges[leftHullOpenEdgesQueue[i]].vStartId].position.y < lowestLeftHullVertexY){
+                lowestLeftHullVertexY = vertices[edges[leftHullOpenEdgesQueue[i]].vStartId].position.y;
+                lowestLeftHullVertexYIndex = edges[leftHullOpenEdgesQueue[i]].vStartId;
+                leftHullEdgeOrigin = leftHullOpenEdgesQueue[i];
+            }
+
+            if (vertices[edges[leftHullOpenEdgesQueue[i]].vEndId].position.y < lowestLeftHullVertexY){
+                lowestLeftHullVertexY = vertices[edges[leftHullOpenEdgesQueue[i]].vEndId].position.y;
+                lowestLeftHullVertexYIndex = edges[leftHullOpenEdgesQueue[i]].vEndId;
+                leftHullEdgeOrigin = leftHullOpenEdgesQueue[i];
+            }
+        }
+    }
+
+    for(int i = 0; i < rightHullOpenEdgesQueue.size(); i++){
+        if (i == 0){
+            if (vertices[edges[rightHullOpenEdgesQueue[i]].vStartId].position.y < vertices[edges[rightHullOpenEdgesQueue[i]].vEndId].position.y){
+                lowestRightHullVertexY = vertices[edges[rightHullOpenEdgesQueue[i]].vStartId].position.y;
+                lowestRightHullVertexYIndex = edges[rightHullOpenEdgesQueue[i]].vStartId;
+                rightHullEdgeOrigin = rightHullOpenEdgesQueue[i];
+            }
+
+            else{
+                lowestRightHullVertexY = vertices[edges[rightHullOpenEdgesQueue[i]].vEndId].position.y;
+                lowestRightHullVertexYIndex = edges[rightHullOpenEdgesQueue[i]].vEndId;
+                rightHullEdgeOrigin = rightHullOpenEdgesQueue[i];
+            }
+        }
+
+        else{
+            if (vertices[edges[rightHullOpenEdgesQueue[i]].vStartId].position.y < lowestLeftHullVertexY){
+                lowestRightHullVertexY = vertices[edges[rightHullOpenEdgesQueue[i]].vStartId].position.y;
+                lowestRightHullVertexYIndex = edges[rightHullOpenEdgesQueue[i]].vStartId;
+                rightHullEdgeOrigin = rightHullOpenEdgesQueue[i];
+            }
+
+            if (vertices[edges[rightHullOpenEdgesQueue[i]].vEndId].position.y < lowestLeftHullVertexY){
+                lowestRightHullVertexY = vertices[edges[rightHullOpenEdgesQueue[i]].vEndId].position.y;
+                lowestRightHullVertexYIndex = edges[rightHullOpenEdgesQueue[i]].vEndId;
+                rightHullEdgeOrigin = rightHullOpenEdgesQueue[i];
+            }
+        }
+    }
+
+    WingedEdge firstEdge(edges.size(), lowestLeftHullVertexYIndex, lowestRightHullVertexYIndex);
+    openEdgesQueue.push_back(edges.size());
+    edges.push_back(firstEdge);
+
+
+}
+
+
+void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int StartVertexRightId, int startEdgeLeftId, int startEdgeRightId){
+    std::vector<int> orderedCWLeftHull, orderedCCWRightHull;
+
+    if(edges[startEdgeLeftId].vEndId == startVertexLeftId){
+        if (edges[startEdgeLeftId].fLeftId == -1){
+            orderedCWLeftHull.push_back(startEdgeLeftId);
+        }
+        else{
+            
+        }
+    }
+}
+
+std::vector<glm::vec3> WingedEdgeMesh::ExtractTriangleVertices() const {
     std::vector<glm::vec3> triangles;
     std::vector<int> vertexIds;
 
@@ -203,7 +495,7 @@ std::vector<glm::vec3> WingedEdgeMesh::extractTriangleVertices() const {
 
 
 
-void WingedEdgeMesh::debugPrint() const {
+void WingedEdgeMesh::DebugPrint() const {
     std::cout << "=== Vertices ===\n";
     for (const auto& v : vertices) {
         std::cout << "Vertex " << v.id << ": ("
@@ -232,7 +524,7 @@ void WingedEdgeMesh::debugPrint() const {
     std::cout << "=====================\n";
 }
 
-void WingedEdgeMesh::clear() {
+void WingedEdgeMesh::Clear() {
     vertices.clear();
     edges.clear();
     faces.clear();

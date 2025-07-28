@@ -56,6 +56,7 @@ private:
     
     //Animate the merge process
     int mergeStep = 0;
+    int maxMergeStep;
 
     //Glfw stuff
     unsigned int samples = 8;

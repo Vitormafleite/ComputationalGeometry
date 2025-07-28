@@ -15,7 +15,7 @@ void Mesh::ClearMeshData(){
     submeshesVertices.clear();
     partitions.clear();
     localHulls.clear();
-    hullsSteps.clear();
+    mergeHullPartitionsColections.clear();
     indices.clear();
 };
 
@@ -158,7 +158,7 @@ void Mesh::buildPartitionConvexHulls() {
         localHulls.push_back(std::move(hullsForSubmesh));
     }
 
-    hullsSteps.push_back(localHulls);
+    mergeHullPartitionsColections.push_back(localHulls);
 }
 
 
@@ -173,7 +173,7 @@ WingedEdgeMesh Mesh::InitialHull(const std::vector<Vector3>& group) {
     for (const auto& point : group) {
         //converting to glm because why not
         glm::vec3 glmPoint(point.x, point.y, point.z);
-        vIds.push_back(hull.addVertex(glmPoint));
+        vIds.push_back(hull.AddVertex(glmPoint));
     }
 
     if (group.size() == 4) {
@@ -188,16 +188,16 @@ WingedEdgeMesh Mesh::InitialHull(const std::vector<Vector3>& group) {
 
         //with four points we can just trivialy the triangles
         if (d > epsilon) {
-            hull.addFaceFromVertices(vIds[1], vIds[3], vIds[2]);
-            hull.addFaceFromVertices(vIds[1], vIds[2], vIds[0]);
-            hull.addFaceFromVertices(vIds[3], vIds[1], vIds[0]);
-            hull.addFaceFromVertices(vIds[2], vIds[3], vIds[0]);
+            hull.AddFaceFromVertices(vIds[1], vIds[3], vIds[2]);
+            hull.AddFaceFromVertices(vIds[1], vIds[2], vIds[0]);
+            hull.AddFaceFromVertices(vIds[3], vIds[1], vIds[0]);
+            hull.AddFaceFromVertices(vIds[2], vIds[3], vIds[0]);
             
         } else {
-            hull.addFaceFromVertices(vIds[1], vIds[2], vIds[3]);
-            hull.addFaceFromVertices(vIds[2], vIds[1], vIds[0]);
-            hull.addFaceFromVertices(vIds[1], vIds[3], vIds[0]);
-            hull.addFaceFromVertices(vIds[3], vIds[2], vIds[0]);
+            hull.AddFaceFromVertices(vIds[1], vIds[2], vIds[3]);
+            hull.AddFaceFromVertices(vIds[2], vIds[1], vIds[0]);
+            hull.AddFaceFromVertices(vIds[1], vIds[3], vIds[0]);
+            hull.AddFaceFromVertices(vIds[3], vIds[2], vIds[0]);
         }
 
     }
@@ -240,9 +240,9 @@ WingedEdgeMesh Mesh::InitialHull(const std::vector<Vector3>& group) {
                     if ((dot1 > epsilon && dot2 > epsilon) || (dot1 < -epsilon && dot2 < -epsilon)) {
                         // Points are below the face
                         if (dot1 > epsilon) { // Points are above the face
-                            hull.addFaceFromVertices(vIds[i], vIds[k], vIds[j]);
+                            hull.AddFaceFromVertices(vIds[i], vIds[k], vIds[j]);
                         } else { // Found a valid face! Add it with correct orientation
-                            hull.addFaceFromVertices(vIds[i], vIds[j], vIds[k]);
+                            hull.AddFaceFromVertices(vIds[i], vIds[j], vIds[k]);
                         }
                         foundValidFace = true;  // Set flag to break all loops
                         break;  // Break innermost loop
@@ -257,14 +257,6 @@ WingedEdgeMesh Mesh::InitialHull(const std::vector<Vector3>& group) {
             int openEdgeId = hull.openEdgesQueue.front();
             int openEdgeStartVertexID = hull.edges[openEdgeId].vStartId; 
             int openEdgeEndVertexID = hull.edges[openEdgeId].vEndId; 
-            
-            std::cout << "Edges Queue: ";
-            
-            for (int i = 0; i < hull.openEdgesQueue.size(); i++){
-                std::cout << hull.openEdgesQueue[i] << ", ";
-            }
-
-            std::cout << std::endl;
 
             std::vector<int> candidateTriangle;
             std::vector<std::vector<int>> candidateTriangleList;
@@ -336,12 +328,139 @@ WingedEdgeMesh Mesh::InitialHull(const std::vector<Vector3>& group) {
             vertex2ID = candidateTriangleList[bestTriangleIndex][1];
             vertex3ID = candidateTriangleList[bestTriangleIndex][2];
 
-            hull.addFaceFromVertices(vIds[vertex1ID], vIds[vertex2ID], vIds[vertex3ID]);
-            std::cout<< vIds[vertex1ID] << " " << vIds[vertex2ID] << " " << vIds[vertex3ID] << std::endl;
+            hull.AddFaceFromVertices(vIds[vertex1ID], vIds[vertex2ID], vIds[vertex3ID]);
+        }
+    }
+    
+    return hull;
+}
+
+bool Mesh::FaceSeeOtherHull(glm::vec3 faceNormal, glm::vec3 faceVertex, std::vector<glm::vec3> otherHullVertices){
+    float dot;
+
+    for (const auto& vertex : otherHullVertices){
+        dot = glm::dot(vertex - faceVertex, faceNormal);
+        if(dot > 0){
+            return true;
         }
     }
 
-    std::cout<< "DONE" << std::endl;
+    return false;
+}
 
-    return hull;
+void Mesh::MergeHull(){
+    int mergeStep = 0;
+    bool allPartitionsDone = false;
+    bool thereAreTwoOrMoreHullsToMerge;
+
+    std::vector<WingedEdgeMesh> mergingHulls;
+    std::vector<std::vector<WingedEdgeMesh>> mergingHullsPartitions;
+
+    //while (!allPartitionsDone){
+        for (int partition = 0; partition < mergeHullPartitionsColections[mergeStep].size();partition++){
+            for (int hull = 0; hull < mergeHullPartitionsColections[mergeStep][partition].size(); hull+=2){
+            
+                thereAreTwoOrMoreHullsToMerge = (hull+2 <= mergeHullPartitionsColections[mergeStep][partition].size());
+
+                if(thereAreTwoOrMoreHullsToMerge){
+                    mergingHulls.push_back(MergeTwoHulls(mergeHullPartitionsColections[mergeStep][partition][hull], mergeHullPartitionsColections[mergeStep][partition][hull+1]));
+                }
+                else 
+                    mergingHulls.push_back(mergeHullPartitionsColections[mergeStep][partition][hull]);
+            }
+
+            mergingHullsPartitions.push_back(mergingHulls);
+            mergingHulls.clear();
+        }
+
+        mergeHullPartitionsColections.push_back(mergingHullsPartitions);
+        mergingHullsPartitions.clear();
+        mergeStep++;
+        allPartitionsDone = true;
+
+        for(int partitionIndex = 0; partitionIndex < mergeHullPartitionsColections[mergeStep].size(); partitionIndex++){
+            if(mergeHullPartitionsColections[mergeStep][partitionIndex].size() > 1)
+                allPartitionsDone = false;
+        }
+
+    //}
+}
+
+WingedEdgeMesh Mesh::LinkHulls(WingedEdgeMesh leftHull, WingedEdgeMesh rightHull){
+    leftHull.leftHullOpenEdgesQueue = leftHull.openEdgesQueue;
+
+    int leftHullVerticesAmount = leftHull.vertices.size();
+    int leftHullEdgesAmount = leftHull.edges.size();
+    int leftHullFacesAmount = leftHull.faces.size();
+    
+    rightHull.AppendDataToLinkHulls(leftHullVerticesAmount, leftHullEdgesAmount, leftHullFacesAmount);
+
+    for (int i = 0; i < rightHull.vertices.size(); i++){
+        leftHull.vertices.push_back(rightHull.vertices[i]);
+    }
+    
+    for (int i = 0; i < rightHull.edges.size(); i++){
+        leftHull.edges.push_back(rightHull.edges[i]);
+    }
+
+    for (int i = 0; i < rightHull.faces.size(); i++){
+        leftHull.faces.push_back(rightHull.faces[i]);
+    }
+
+    leftHull.rightHullOpenEdgesQueue = rightHull.openEdgesQueue;
+
+    for(int i = 0; i < rightHull.openEdgesQueue.size(); i++){
+        leftHull.openEdgesQueue.push_back(rightHull.openEdgesQueue[i]);
+    }
+
+    return leftHull;
+}
+
+WingedEdgeMesh Mesh::MergeTwoHulls(WingedEdgeMesh leftHull, WingedEdgeMesh rightHull){
+
+    bool faceSeesOtherHull;
+    glm::vec3 faceVertexPosition;
+    glm::vec3 faceNormal;
+
+    int edgeId, vertexID;
+
+    std::vector<glm::vec3> leftHullVerticesPositions = leftHull.ExtractVerticesPositions();
+    std::vector<glm::vec3> rightHullVerticesPositions = rightHull.ExtractVerticesPositions();
+
+    for(int faceId = 0; faceId < leftHull.faces.size(); faceId++){
+        faceNormal = leftHull.faces[faceId].faceNormal;
+
+        edgeId = leftHull.faces[faceId].edgeId;
+        vertexID = leftHull.edges[edgeId].vStartId;
+        faceVertexPosition = leftHull.vertices[vertexID].position;
+
+        faceSeesOtherHull = FaceSeeOtherHull(faceNormal, faceVertexPosition, rightHullVerticesPositions);
+
+        if(faceSeesOtherHull){
+            leftHull.DeleteFace(faceId);
+        }
+    }
+
+    for(int faceId = 0; faceId < rightHull.faces.size(); faceId++){
+        faceNormal = rightHull.faces[faceId].faceNormal;
+
+        edgeId = rightHull.faces[faceId].edgeId;
+        vertexID = rightHull.edges[edgeId].vStartId;
+        faceVertexPosition = rightHull.vertices[vertexID].position;
+
+        faceSeesOtherHull = FaceSeeOtherHull(faceNormal, faceVertexPosition, leftHullVerticesPositions);
+
+        if(faceSeesOtherHull){
+            rightHull.DeleteFace(faceId);
+        }
+    }
+
+    leftHull.FixMeshAfterDeletions();
+    rightHull.FixMeshAfterDeletions();
+
+    WingedEdgeMesh resultHull = LinkHulls(leftHull, rightHull);
+    
+    resultHull.DebugPrint();
+
+    return resultHull;
 }

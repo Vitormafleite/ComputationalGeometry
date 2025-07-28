@@ -23,7 +23,7 @@ private:
 
     float yaw;
     float pitch;
-    float speed = 10.0f;
+    float speed = 6.0f;
     float sensitivity = 0.2f;
 
     void updateCameraVectors();

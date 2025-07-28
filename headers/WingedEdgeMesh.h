@@ -59,18 +59,32 @@ public:
     std::vector<Face> faces;
 
     std::vector<int> openEdgesQueue; // while we build the winged edge table, edges only get half built when a face is inserted, so we need to track that and fill them later 
+    
+    //use this for merging only
+    std::vector<int> leftHullOpenEdgesQueue;
+    std::vector<int> rightHullOpenEdgesQueue;
 
-    int addVertex(const glm::vec3& pos);
+    int AddVertex(const glm::vec3& pos);
 
-    int addFaceFromVertices(int a, int b, int c);
+    void AddFaceFromVertices(int a, int b, int c);
 
-    int checkHowManyEdgesTriangleRemovesFromQueue(int a, int b, int c);
+    std::vector<glm::vec3> ExtractVerticesPositions(); 
 
-    std::vector<glm::vec3> extractTriangleVertices() const;
+    void DeleteFace(int faceID);
+    void DeleteFaceFromEdge(int faceID, int EdgeID, bool isLeftFace);
 
-    void debugPrint() const;
+    void FixMeshAfterDeletions();
+    void AppendDataToLinkHulls(int verticesAmount, int edgesAmount, int facesAmount);
+    void AddFirstMergingEdge();
+    void OrderLeftAndRightQueues(int startVertexLeftId, int StartVertexRightId, int startEdgeLeftId, int startEdgeRightId);
 
-    void clear();
+    int CheckHowManyEdgesTriangleRemovesFromQueue(int a, int b, int c);
+
+    std::vector<glm::vec3> ExtractTriangleVertices() const;
+
+    void DebugPrint() const;
+
+    void Clear();
 };
 
 #endif // WINGEDEDGEMESH_H
