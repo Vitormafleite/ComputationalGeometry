@@ -309,14 +309,14 @@ WingedEdgeMesh Mesh::InitialHull(const std::vector<Vector3>& group) {
                     vertex1ID = candidateTriangleList[0][0];
                     vertex2ID = candidateTriangleList[0][1];
                     vertex3ID = candidateTriangleList[0][2];
-                    bestTriangleScore = hull.checkHowManyEdgesTriangleRemovesFromQueue(vertex1ID, vertex2ID, vertex3ID);
+                    bestTriangleScore = hull.CheckHowManyEdgesTriangleRemovesFromQueue(vertex1ID, vertex2ID, vertex3ID);
                 }
 
                 else {
                     vertex1ID = candidateTriangleList[i][0];
                     vertex2ID = candidateTriangleList[i][1];
                     vertex3ID = candidateTriangleList[i][2];
-                    triangleScore = hull.checkHowManyEdgesTriangleRemovesFromQueue(vertex1ID, vertex2ID, vertex3ID);
+                    triangleScore = hull.CheckHowManyEdgesTriangleRemovesFromQueue(vertex1ID, vertex2ID, vertex3ID);
                     if(triangleScore > bestTriangleScore){
                         bestTriangleIndex = i;
                         bestTriangleScore = triangleScore;
