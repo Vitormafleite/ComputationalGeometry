@@ -11,6 +11,6 @@ void main() {
     gl_Position = uProjection * uView * uModel * vec4(aPos, 1.0);
     
     if (uRenderingPoints) {
-        gl_PointSize = 4.0;
+        gl_PointSize = 3.0;
     }
 }

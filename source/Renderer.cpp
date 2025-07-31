@@ -29,6 +29,7 @@ bool Renderer::init(int width, int height, const char* title) {
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "Failed to initialize GLAD\n";
+        glfwTerminate();
         return false;
     }
 
@@ -39,9 +40,9 @@ bool Renderer::init(int width, int height, const char* title) {
     ImGui_ImplOpenGL3_Init("#version 460");
 
     // Enable face culling and set CCW as front face
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK); // Cull back faces
-    glFrontFace(GL_CCW); // Counter-clockwise winding is front face
+    glDisable(GL_CULL_FACE);
+    //glCullFace(GL_BACK); // Cull back faces
+    //glFrontFace(GL_CCW); // Counter-clockwise winding is front face
     
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
@@ -58,7 +59,50 @@ bool Renderer::init(int width, int height, const char* title) {
     view = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -20.0f));
     projection = glm::perspective(glm::radians(45.0f), 1200.0f / 900.0f, 0.1f, 100.0f);
 
+    // Initialize the grid
+    createGrid();
+
     return true;
+}
+
+void Renderer::createGrid() {
+    const int gridSize = 20; // Number of grid lines on each side
+    const float gridSpacing = 1.0f; // Distance between grid lines
+    const float gridExtent = gridSize * gridSpacing; // Total size of the grid
+    
+    std::vector<glm::vec3> gridVertices;
+    
+    // Create grid lines parallel to X-axis (constant Z)
+    for (int i = -gridSize; i <= gridSize; ++i) {
+        float z = i * gridSpacing;
+        // Start and end points for this line
+        gridVertices.push_back(glm::vec3(-gridExtent, 0.0f, z));
+        gridVertices.push_back(glm::vec3(gridExtent, 0.0f, z));
+    }
+    
+    // Create grid lines parallel to Z-axis (constant X)
+    for (int i = -gridSize; i <= gridSize; ++i) {
+        float x = i * gridSpacing;
+        // Start and end points for this line
+        gridVertices.push_back(glm::vec3(x, 0.0f, -gridExtent));
+        gridVertices.push_back(glm::vec3(x, 0.0f, gridExtent));
+    }
+    
+    // Generate and bind VAO/VBO for grid
+    glGenVertexArrays(1, &gridVAO);
+    glGenBuffers(1, &gridVBO);
+    
+    glBindVertexArray(gridVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, gridVBO);
+    glBufferData(GL_ARRAY_BUFFER, gridVertices.size() * sizeof(glm::vec3), gridVertices.data(), GL_STATIC_DRAW);
+    
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    
+    gridVertexCount = static_cast<GLsizei>(gridVertices.size());
 }
 
 void Renderer::loadOBJFilesFromFolder(const std::string& folderPath) {
@@ -165,6 +209,16 @@ void Renderer::shutdown() {
         
         shader.cleanup();
         ClearBuffers();
+
+        // Clean up grid buffers (not handled by ClearBuffers)
+        if (gridVAO != 0) {
+            glDeleteVertexArrays(1, &gridVAO);
+            gridVAO = 0;
+        }
+        if (gridVBO != 0) {
+            glDeleteBuffers(1, &gridVBO);
+            gridVBO = 0;
+        }
 
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
@@ -295,22 +349,69 @@ void Renderer::renderGeometry() {
     shader.setMat4("uView", view);
     shader.setMat4("uProjection", projection);
     
+    // Render the grid first (behind everything else)
+    if (gridVAO != 0 && gridVertexCount > 0) {
+        shader.setBool("uRenderingPoints", false);
+        shader.setBool("uWireframePass", false);
+        shader.setBool("uRenderingGrid", true);
+        
+        // Ensure grid is rendered with proper depth testing
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+        
+        glBindVertexArray(gridVAO);
+        glDrawArrays(GL_LINES, 0, gridVertexCount);
+        glBindVertexArray(0);
+        
+        shader.setBool("uRenderingGrid", false);
+    }
+    
     shader.setBool("uRenderingPoints", true);
     for (size_t i = 0; i < pointCloudVAOs.size(); ++i) {
         glBindVertexArray(pointCloudVAOs[i]);
         glDrawArrays(GL_POINTS, 0, pointCloudVertexCounts[i]);
     }
-    
-    glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
-
+  
     shader.setBool("uRenderingPoints", false);
-    for (size_t i = 0; i < miniHullVAOs.size(); ++i) {
-        glBindVertexArray(miniHullVAOs[i]);
-        glDrawArrays(GL_TRIANGLES, 0, miniHullVertexCounts[i]);
+    shader.setBool("uWireframePass", false);
+
+    if (wireframeMode) {
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        for (size_t i = 0; i < miniHullVAOs.size(); ++i) {
+            glBindVertexArray(miniHullVAOs[i]);
+            glDrawArrays(GL_TRIANGLES, 0, miniHullVertexCounts[i]);
+        }
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glDisable(GL_CULL_FACE);
+    } else {
+        // 1. Render filled polygons
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        for (size_t i = 0; i < miniHullVAOs.size(); ++i) {
+            glBindVertexArray(miniHullVAOs[i]);
+            glDrawArrays(GL_TRIANGLES, 0, miniHullVertexCounts[i]);
+        }
+
+        // 2. Render wireframe overlay
+        glEnable(GL_POLYGON_OFFSET_LINE);
+        glPolygonOffset(-1.0f, -1.0f); // pull forward to avoid z-fighting
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+        shader.setBool("uWireframePass", true);
+        for (size_t i = 0; i < miniHullVAOs.size(); ++i) {
+            glBindVertexArray(miniHullVAOs[i]);
+            glDrawArrays(GL_TRIANGLES, 0, miniHullVertexCounts[i]);
+        }
+
+        // Reset
+        shader.setBool("uWireframePass", false);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glDisable(GL_POLYGON_OFFSET_LINE);
     }
-    //add diferent GL_line for better geometry visuals
-    //add XZ-plane grid for better visualization
-    
+
     glBindVertexArray(0);
 }
 
@@ -331,12 +432,16 @@ void Renderer::ClearBuffers(){
         glDeleteBuffers(1, &vbo);
     }
 
+    // Note: Grid buffers are NOT deleted here because the grid should persist
+    // throughout the application lifecycle
+
     pointCloudVAOs.clear();
     pointCloudVBOs.clear();
     pointCloudVertexCounts.clear();
     miniHullVAOs.clear();
     miniHullVBOs.clear();
     miniHullVertexCounts.clear();
+    // gridVertexCount is not reset here as the grid should remain
 }
 
 void Renderer::handleCameraInput() {

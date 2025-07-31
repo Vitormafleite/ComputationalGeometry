@@ -77,6 +77,7 @@ public:
     void AppendDataToLinkHulls(int verticesAmount, int edgesAmount, int facesAmount);
     void AddFirstMergingEdge();
     void OrderLeftAndRightQueues(int startVertexLeftId, int StartVertexRightId, int startEdgeLeftId, int startEdgeRightId);
+    void SewHulls();
 
     int CheckHowManyEdgesTriangleRemovesFromQueue(int a, int b, int c);
 

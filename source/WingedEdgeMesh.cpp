@@ -126,9 +126,16 @@ void WingedEdgeMesh::AddFaceFromVertices(int vertexA, int vertexB, int vertexC) 
     }
 
     else{
-        edges[edgeABID].eRightNextId = edgeCAID;
-        edges[edgeABID].eRightPrevId = edgeBCID;
-        edges[edgeABID].fRightId = newFace.id;
+        if(edges[edgeABID].fRightId == -1){
+            edges[edgeABID].eRightNextId = edgeCAID;
+            edges[edgeABID].eRightPrevId = edgeBCID;
+            edges[edgeABID].fRightId = newFace.id;
+        }
+        else if(edges[edgeABID].fLeftId == -1){
+            edges[edgeABID].eLeftNextId = edgeBCID;
+            edges[edgeABID].eLeftPrevId = edgeCAID;
+            edges[edgeABID].fLeftId = newFace.id;
+        }
     }
 
     if(edgeBCID > edgesTableHighestID){
@@ -138,9 +145,16 @@ void WingedEdgeMesh::AddFaceFromVertices(int vertexA, int vertexB, int vertexC) 
     }
 
     else{
-        edges[edgeBCID].eRightNextId = edgeCAID;
-        edges[edgeBCID].eRightPrevId = edgeBCID;
-        edges[edgeBCID].fRightId = newFace.id;
+        if(edges[edgeBCID].fRightId == -1){
+            edges[edgeBCID].eRightNextId = edgeABID;
+            edges[edgeBCID].eRightPrevId = edgeCAID;
+            edges[edgeBCID].fRightId = newFace.id;
+        }
+        else if(edges[edgeBCID].fLeftId == -1){
+            edges[edgeBCID].eLeftNextId = edgeCAID;
+            edges[edgeBCID].eLeftPrevId = edgeABID;
+            edges[edgeBCID].fLeftId = newFace.id;
+        }
     }
 
     if(edgeCAID > edgesTableHighestID){
@@ -150,9 +164,16 @@ void WingedEdgeMesh::AddFaceFromVertices(int vertexA, int vertexB, int vertexC) 
     }
 
     else{
-        edges[edgeCAID].eRightNextId = edgeCAID;
-        edges[edgeCAID].eRightPrevId = edgeBCID;
-        edges[edgeCAID].fRightId = newFace.id;
+        if(edges[edgeCAID].fRightId == -1){
+            edges[edgeCAID].eRightNextId = edgeBCID;
+            edges[edgeCAID].eRightPrevId = edgeABID;
+            edges[edgeCAID].fRightId = newFace.id;
+        }
+        else if (edges[edgeCAID].fLeftId == -1) {
+            edges[edgeCAID].eLeftNextId = edgeABID;
+            edges[edgeCAID].eLeftPrevId = edgeBCID;
+            edges[edgeCAID].fLeftId = newFace.id;
+        }
     }
 
     if (vertices[vertexA].edgeId == -1) vertices[vertexA].edgeId = edgeABID;
@@ -343,14 +364,21 @@ void WingedEdgeMesh::AppendDataToLinkHulls(int verticesAmount, int edgesAmount, 
 
     for (int edgeIndex = 0; edgeIndex < edges.size(); edgeIndex++){
             edges[edgeIndex].id += edgesAmount;
-            edges[edgeIndex].eLeftNextId += edgesAmount;
-            edges[edgeIndex].eLeftPrevId += edgesAmount;
-            edges[edgeIndex].eRightNextId += edgesAmount;
-            edges[edgeIndex].eRightPrevId += edgesAmount;
+            if(edges[edgeIndex].fLeftId != -1){
+                edges[edgeIndex].eLeftNextId += edgesAmount;
+                edges[edgeIndex].eLeftPrevId += edgesAmount;
+                edges[edgeIndex].fLeftId += facesAmount;
+            }
+
+            if(edges[edgeIndex].fRightId != -1){
+                edges[edgeIndex].eRightNextId += edgesAmount;
+                edges[edgeIndex].eRightPrevId += edgesAmount;
+                edges[edgeIndex].fRightId += facesAmount;
+            }
+
             edges[edgeIndex].vEndId += verticesAmount;
             edges[edgeIndex].vStartId += verticesAmount;
-            edges[edgeIndex].fLeftId += facesAmount;
-            edges[edgeIndex].fRightId += facesAmount;
+            
         }
 
         for (int faceIndex = 0; faceIndex < faces.size(); faceIndex++){
@@ -359,7 +387,9 @@ void WingedEdgeMesh::AppendDataToLinkHulls(int verticesAmount, int edgesAmount, 
         }
 
         for (int vertexIndex = 0; vertexIndex < vertices.size(); vertexIndex++){
-            vertices[vertexIndex].edgeId += edgesAmount;
+            if(vertices[vertexIndex].edgeId != -1){
+                vertices[vertexIndex].edgeId += edgesAmount;
+            }
             vertices[vertexIndex].id += verticesAmount;
         }
 
@@ -371,6 +401,7 @@ void WingedEdgeMesh::AppendDataToLinkHulls(int verticesAmount, int edgesAmount, 
 void WingedEdgeMesh::AddFirstMergingEdge(){
     int lowestLeftHullVertexY, lowestRightHullVertexY, lowestLeftHullVertexYIndex, lowestRightHullVertexYIndex;
     int leftHullEdgeOrigin, rightHullEdgeOrigin;
+
 
     //CAN IMPROVE TO CHECK POINTS ONLY ONCE, DOING IT LAZY NOW AND CHECKING TWICE
     for(int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
@@ -437,21 +468,334 @@ void WingedEdgeMesh::AddFirstMergingEdge(){
     openEdgesQueue.push_back(edges.size());
     edges.push_back(firstEdge);
 
+    //DebugPrint();
+//
+    //std::cout<< "lowestLeftHullVertexYIndex: " << lowestLeftHullVertexYIndex <<std::endl;
+    //std::cout<< "lowestRightHullVertexYIndex: " << lowestRightHullVertexYIndex <<std::endl;
+    //std::cout<< "leftHullEdgeOrigin: " << leftHullEdgeOrigin <<std::endl;
+    //std::cout<< "righttHullEdgeOrigin: " << rightHullEdgeOrigin <<std::endl;
+
+
+    OrderLeftAndRightQueues(lowestLeftHullVertexYIndex, lowestRightHullVertexYIndex, leftHullEdgeOrigin, rightHullEdgeOrigin);
+
+    //DebugPrint();
+
+   // std::cout<< "left edges :" <<std::endl;
+   // for (int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
+   //     std::cout<< leftHullOpenEdgesQueue[i] <<std::endl;
+   // }
+   // std::cout<< "right edges :" <<std::endl;
+   // for (int i = 0; i < rightHullOpenEdgesQueue.size(); i++){
+   //     std::cout<< rightHullOpenEdgesQueue[i] <<std::endl;
+   // }
 
 }
 
+void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVertexRightId, int startEdgeLeftId, int startEdgeRightId){
 
-void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int StartVertexRightId, int startEdgeLeftId, int startEdgeRightId){
+//    std::cout << "Left before:" << std::endl;
+//    for (int i = 0 ; i < leftHullOpenEdgesQueue.size(); i++){
+//        std::cout << leftHullOpenEdgesQueue[i] << " " << std::endl;
+//    }
+//    std::cout << "Right before:" << std::endl;
+//    for (int i = 0 ; i < rightHullOpenEdgesQueue.size(); i++){
+//        std::cout << rightHullOpenEdgesQueue[i] << " " << std::endl;
+//    }
+
     std::vector<int> orderedCWLeftHull, orderedCCWRightHull;
 
-    if(edges[startEdgeLeftId].vEndId == startVertexLeftId){
-        if (edges[startEdgeLeftId].fLeftId == -1){
+    int nextVertexToLookForLeft, nextVertexToLookForRight;
+
+    //std::cout << "nextVertexToLookForLeft: " << nextVertexToLookForLeft << std::endl;
+    //std::cout << "nextVertexToLookForRight: " << nextVertexToLookForRight << std::endl;
+    //std::cout << "startEdgeLeftId: " << startEdgeLeftId << std::endl;
+    //std::cout << "startEdgeRightId: " << startEdgeRightId << std::endl;
+    //std::cout << "RightVertex: " << startVertexRightId << std::endl;
+    //std::cout << "Looking for vertex: " << nextVertexToLookForRight << std::endl;
+
+    if(edges[startEdgeLeftId].fLeftId == -1){
+        if (edges[startEdgeLeftId].vEndId == startVertexLeftId){
             orderedCWLeftHull.push_back(startEdgeLeftId);
+            leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());
+            nextVertexToLookForLeft = edges[startEdgeLeftId].vStartId;
         }
-        else{
-            
+        else if (edges[startEdgeLeftId].vStartId == startVertexLeftId){
+            for (int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
+                if (leftHullOpenEdgesQueue[i] != startEdgeLeftId){
+                    if(edges[leftHullOpenEdgesQueue[i]].vEndId == startVertexLeftId && (edges[leftHullOpenEdgesQueue[i]].fRightId == -1 || edges[leftHullOpenEdgesQueue[i]].fLeftId == -1)){
+                        startEdgeLeftId = leftHullOpenEdgesQueue[i];
+                        orderedCWLeftHull.push_back(startEdgeLeftId);
+                        nextVertexToLookForLeft = edges[startEdgeLeftId].vStartId;
+                        leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());  
+                        break;
+                    }
+
+                    else if(edges[i].vStartId == startVertexLeftId && (edges[i].fRightId == -1 || edges[i].fLeftId == -1)){
+                        startEdgeLeftId = i;
+                        orderedCWLeftHull.push_back(startEdgeLeftId);
+                        leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());
+                        nextVertexToLookForLeft = edges[i].vEndId;
+                        break;
+                    }
+                }
+            }
         }
     }
+
+    else if(edges[startEdgeLeftId].fRightId == -1){
+        if (edges[startEdgeLeftId].vStartId == startVertexLeftId){
+            orderedCWLeftHull.push_back(startEdgeLeftId);
+            leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());
+            nextVertexToLookForLeft = edges[startEdgeLeftId].vEndId;
+        }
+        else if (edges[startEdgeLeftId].vEndId == startVertexLeftId){
+            for (int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
+                if (leftHullOpenEdgesQueue[i] != startEdgeLeftId){
+                    if(edges[leftHullOpenEdgesQueue[i]].vEndId == startVertexLeftId && (edges[leftHullOpenEdgesQueue[i]].fRightId == -1 || edges[leftHullOpenEdgesQueue[i]].fLeftId == -1)){
+                        startEdgeLeftId = leftHullOpenEdgesQueue[i];
+                        orderedCWLeftHull.push_back(startEdgeLeftId);
+                        nextVertexToLookForLeft = edges[startEdgeLeftId].vStartId;
+                        leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());  
+                        break;
+                    }
+
+                    else if(edges[leftHullOpenEdgesQueue[i]].vStartId == startVertexLeftId && (edges[leftHullOpenEdgesQueue[i]].fRightId == -1 || edges[leftHullOpenEdgesQueue[i]].fLeftId == -1)){
+                        startEdgeLeftId = leftHullOpenEdgesQueue[i];
+                        orderedCWLeftHull.push_back(startEdgeLeftId);
+                        nextVertexToLookForLeft = edges[startEdgeLeftId].vEndId;
+                        leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if(edges[startEdgeRightId].fLeftId == -1){
+        if (edges[startEdgeRightId].vStartId == startVertexRightId){
+            orderedCCWRightHull.push_back(startEdgeRightId);
+            rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());
+            nextVertexToLookForRight = edges[startEdgeRightId].vEndId; 
+        }
+        else if (edges[startEdgeRightId].vEndId == startVertexRightId){
+            for (int i = 0; i < rightHullOpenEdgesQueue.size(); i++){
+                if (rightHullOpenEdgesQueue[i] != startEdgeRightId){
+                    if(edges[rightHullOpenEdgesQueue[i]].vEndId == startVertexRightId && (edges[rightHullOpenEdgesQueue[i]].fRightId == -1 || edges[rightHullOpenEdgesQueue[i]].fLeftId == -1)){
+                        startEdgeRightId = rightHullOpenEdgesQueue[i];
+                        orderedCCWRightHull.push_back(startEdgeRightId);
+                        nextVertexToLookForRight = edges[startEdgeRightId].vStartId; 
+                        rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());  
+                        break;
+                    }
+
+                    else if(edges[rightHullOpenEdgesQueue[i]].vStartId == startVertexRightId && (edges[rightHullOpenEdgesQueue[i]].fRightId == -1 || edges[rightHullOpenEdgesQueue[i]].fLeftId == -1)){
+                        startEdgeRightId = rightHullOpenEdgesQueue[i];
+                        orderedCCWRightHull.push_back(startEdgeRightId);
+                        nextVertexToLookForRight = edges[startEdgeRightId].vEndId;
+                        rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    else if(edges[startEdgeRightId].fRightId == -1){
+        if (edges[startEdgeRightId].vEndId == startVertexRightId){
+            orderedCCWRightHull.push_back(startEdgeRightId);
+            rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());
+            nextVertexToLookForRight = edges[startEdgeRightId].vStartId; 
+        }
+        else if (edges[startEdgeRightId].vStartId == startVertexRightId){
+            for (int i = 0; i < rightHullOpenEdgesQueue.size(); i++){
+                if (rightHullOpenEdgesQueue[i] != startEdgeRightId){
+                    if(edges[rightHullOpenEdgesQueue[i]].vEndId == startVertexRightId && (edges[rightHullOpenEdgesQueue[i]].fRightId == -1 || edges[rightHullOpenEdgesQueue[i]].fLeftId == -1)){
+                        startEdgeRightId = rightHullOpenEdgesQueue[i];
+                        orderedCCWRightHull.push_back(startEdgeRightId);
+                        nextVertexToLookForRight = edges[startEdgeRightId].vStartId;
+                        rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());  
+                        break;
+                    }
+
+                    else if(edges[rightHullOpenEdgesQueue[i]].vStartId == startVertexRightId && (edges[rightHullOpenEdgesQueue[i]].fRightId == -1 || edges[rightHullOpenEdgesQueue[i]].fLeftId == -1)){
+                        startEdgeRightId = rightHullOpenEdgesQueue[i];
+                        orderedCCWRightHull.push_back(startEdgeRightId);
+                        nextVertexToLookForRight = edges[startEdgeRightId].vEndId;
+                        rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    while (leftHullOpenEdgesQueue.size() > 0){
+
+        for (int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
+            if(edges[leftHullOpenEdgesQueue[i]].vEndId == nextVertexToLookForLeft){
+                orderedCWLeftHull.push_back(leftHullOpenEdgesQueue[i]);
+                nextVertexToLookForLeft = edges[leftHullOpenEdgesQueue[i]].vStartId;
+                leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), leftHullOpenEdgesQueue[i]), leftHullOpenEdgesQueue.end());
+            }
+
+            else if(edges[leftHullOpenEdgesQueue[i]].vStartId == nextVertexToLookForLeft){
+                orderedCWLeftHull.push_back(leftHullOpenEdgesQueue[i]);
+                nextVertexToLookForLeft = edges[leftHullOpenEdgesQueue[i]].vEndId;
+                leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), leftHullOpenEdgesQueue[i]), leftHullOpenEdgesQueue.end());
+            }
+        }
+    }
+
+
+    while (rightHullOpenEdgesQueue.size() > 0){
+        for (int i = 0; i < rightHullOpenEdgesQueue.size(); i++){
+            if(edges[rightHullOpenEdgesQueue[i]].vEndId == nextVertexToLookForRight){
+                orderedCCWRightHull.push_back(rightHullOpenEdgesQueue[i]);
+                nextVertexToLookForRight = edges[rightHullOpenEdgesQueue[i]].vStartId;
+                rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), rightHullOpenEdgesQueue[i]), rightHullOpenEdgesQueue.end());
+            }
+
+            else if(edges[rightHullOpenEdgesQueue[i]].vStartId == nextVertexToLookForRight){
+                orderedCCWRightHull.push_back(rightHullOpenEdgesQueue[i]);
+                nextVertexToLookForRight = edges[rightHullOpenEdgesQueue[i]].vEndId;
+                rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), rightHullOpenEdgesQueue[i]), rightHullOpenEdgesQueue.end());
+            } 
+        }
+    }
+
+    std::reverse(orderedCCWRightHull.begin(), orderedCCWRightHull.end());
+    std::reverse(orderedCWLeftHull.begin(), orderedCWLeftHull.end());
+    
+    rightHullOpenEdgesQueue = orderedCCWRightHull;
+    leftHullOpenEdgesQueue = orderedCWLeftHull;
+
+    //std::cout << " leftHullOpenEdgesQueue after:" << std::endl;
+    //for (int i = 0 ; i < leftHullOpenEdgesQueue.size(); i++){
+    //    std::cout << leftHullOpenEdgesQueue[i] << " " << std::endl;
+    //}
+//
+    //std::cout << " rightHullOpenEdgesQueue after:" << std::endl;
+    //for (int i = 0 ; i < rightHullOpenEdgesQueue.size(); i++){
+    //    std::cout << rightHullOpenEdgesQueue[i] << " " << std::endl;
+    //}
+
+}
+
+void WingedEdgeMesh::SewHulls(){
+    const float epsilon = 1e-6f;
+    bool isFirstIteration = true;
+    int vertex1, vertex2, aux;
+
+    int nextEdgeLeft, nextEdgeRight;
+    int nextVertexLeft, nextVertexRight;    
+
+    int firtsSewedEdge = openEdgesQueue.back();
+
+    int maxSewings = 4;
+    int sewings = 0;
+
+    while(openEdgesQueue.size() > 0 ){
+
+        vertex1 = edges[openEdgesQueue.back()].vStartId;
+        vertex2 = edges[openEdgesQueue.back()].vEndId;
+
+        if (vertex1 > vertex2){
+            aux = vertex1;
+            vertex1 = vertex2;
+            vertex2 = aux;
+        }
+
+
+        if(rightHullOpenEdgesQueue.size() > 0 && leftHullOpenEdgesQueue.size() > 0){
+            nextEdgeLeft = leftHullOpenEdgesQueue.back();
+            if (edges[nextEdgeLeft].vEndId == vertex1){
+                nextVertexLeft = edges[nextEdgeLeft].vStartId;
+            }
+            else if (edges[nextEdgeLeft].vStartId == vertex1){
+                nextVertexLeft = edges[nextEdgeLeft].vEndId;
+            }
+    
+            nextEdgeRight = rightHullOpenEdgesQueue.back();
+            if (edges[nextEdgeRight].vEndId == vertex2){
+                nextVertexRight = edges[nextEdgeRight].vStartId;
+            }
+            else if (edges[nextEdgeRight].vStartId == vertex2){
+                nextVertexRight = edges[nextEdgeRight].vEndId;
+            }
+
+            glm::vec3 A = vertices[vertex1].position;
+            glm::vec3 B = vertices[vertex2].position;
+            glm::vec3 C = vertices[nextVertexLeft].position;
+            
+            glm::vec3 P = vertices[nextVertexRight].position;
+            
+            glm::vec3 faceNormal = glm::normalize(glm::cross(B - A, C - A));
+            
+            float dotProduct = glm::dot(P - A, faceNormal);
+            
+            bool nextVertexRightInFront = dotProduct > epsilon;
+            bool nextVertexRightBehind = dotProduct < -epsilon;
+            bool nextVertexRightOnFace = !nextVertexRightInFront && !nextVertexRightBehind;
+
+            if(isFirstIteration){
+                edges.pop_back();
+                isFirstIteration = false;
+            }
+
+            if (nextVertexRightBehind) {
+                AddFaceFromVertices(vertex1, vertex2, nextVertexLeft);
+                leftHullOpenEdgesQueue.pop_back();
+
+            } else if (nextVertexRightInFront) {
+                AddFaceFromVertices(vertex1, vertex2, nextVertexRight);
+                rightHullOpenEdgesQueue.pop_back();
+
+            } else {
+                //coplanar case, just go with left side
+                AddFaceFromVertices(vertex1, vertex2, nextVertexLeft);
+                leftHullOpenEdgesQueue.pop_back();
+            }
+        }
+
+        else if(leftHullOpenEdgesQueue.size() > 0){
+            nextEdgeLeft = leftHullOpenEdgesQueue.back();
+            if (edges[nextEdgeLeft].vEndId == vertex1){
+                nextVertexLeft = edges[nextEdgeLeft].vStartId;
+            }
+            else if (edges[nextEdgeLeft].vStartId == vertex1){
+                nextVertexLeft = edges[nextEdgeLeft].vEndId;
+            }
+
+            AddFaceFromVertices(vertex1, vertex2, nextVertexLeft);
+            leftHullOpenEdgesQueue.pop_back();
+        }
+
+        else if (rightHullOpenEdgesQueue.size() > 0){
+            nextEdgeRight = rightHullOpenEdgesQueue.back();
+            if (edges[nextEdgeRight].vEndId == vertex2){
+                nextVertexRight = edges[nextEdgeRight].vStartId;
+            }
+            else if (edges[nextEdgeRight].vStartId == vertex2){
+                nextVertexRight = edges[nextEdgeRight].vEndId;
+            }
+
+            AddFaceFromVertices(vertex1, vertex2, nextVertexRight);
+            rightHullOpenEdgesQueue.pop_back();
+        } 
+        
+        sewings++;
+
+        //std::cout<< "left edges :" <<std::endl;
+        //for (int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
+        //    std::cout<< leftHullOpenEdgesQueue[i] <<std::endl;
+        //}
+        //std::cout<< "right edges :" <<std::endl;
+        //for (int i = 0; i < rightHullOpenEdgesQueue.size(); i++){
+        //    std::cout<< rightHullOpenEdgesQueue[i] <<std::endl;
+        //}
+        
+    }
+    //DebugPrint();
 }
 
 std::vector<glm::vec3> WingedEdgeMesh::ExtractTriangleVertices() const {

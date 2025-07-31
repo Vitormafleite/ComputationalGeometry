@@ -53,6 +53,7 @@ private:
 
     GLuint gridVAO = 0;
     GLuint gridVBO = 0;
+    GLsizei gridVertexCount = 0;
     
     //Animate the merge process
     int mergeStep = 0;
@@ -77,6 +78,7 @@ private:
     float lastFrame = 0.0f;
 
     void handleCameraInput();
+    void createGrid();
 };
 
 #endif // RENDERER_H
