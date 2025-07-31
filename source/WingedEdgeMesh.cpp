@@ -1,4 +1,5 @@
 #include "../headers/WingedEdgeMesh.h"
+#include <vector>
 
 int WingedEdgeMesh::AddVertex(const glm::vec3& pos) {
     int id = static_cast<int>(vertices.size());
@@ -130,11 +131,23 @@ void WingedEdgeMesh::AddFaceFromVertices(int vertexA, int vertexB, int vertexC) 
             edges[edgeABID].eRightNextId = edgeCAID;
             edges[edgeABID].eRightPrevId = edgeBCID;
             edges[edgeABID].fRightId = newFace.id;
+
+            if(edges[edgeABID].fLeftId != -1){
+                glm::vec3 leftFaceNormal = faces[edges[edgeABID].fLeftId].faceNormal;
+                glm::vec3 rightFaceNormal = faces[edges[edgeABID].fRightId].faceNormal;
+                edges[edgeABID].edgeInstantNormal = glm::normalize(leftFaceNormal + rightFaceNormal);
+            }
         }
         else if(edges[edgeABID].fLeftId == -1){
             edges[edgeABID].eLeftNextId = edgeBCID;
             edges[edgeABID].eLeftPrevId = edgeCAID;
             edges[edgeABID].fLeftId = newFace.id;
+
+            if(edges[edgeABID].fRightId != -1){
+                glm::vec3 leftFaceNormal = faces[edges[edgeABID].fLeftId].faceNormal;
+                glm::vec3 rightFaceNormal = faces[edges[edgeABID].fRightId].faceNormal;
+                edges[edgeABID].edgeInstantNormal = glm::normalize(leftFaceNormal + rightFaceNormal);
+            }
         }
     }
 
@@ -149,11 +162,23 @@ void WingedEdgeMesh::AddFaceFromVertices(int vertexA, int vertexB, int vertexC) 
             edges[edgeBCID].eRightNextId = edgeABID;
             edges[edgeBCID].eRightPrevId = edgeCAID;
             edges[edgeBCID].fRightId = newFace.id;
+
+            if(edges[edgeBCID].fLeftId != -1){
+                glm::vec3 leftFaceNormal = faces[edges[edgeBCID].fLeftId].faceNormal;
+                glm::vec3 rightFaceNormal = faces[edges[edgeBCID].fRightId].faceNormal;
+                edges[edgeBCID].edgeInstantNormal = glm::normalize(leftFaceNormal + rightFaceNormal);
+            }
         }
         else if(edges[edgeBCID].fLeftId == -1){
             edges[edgeBCID].eLeftNextId = edgeCAID;
             edges[edgeBCID].eLeftPrevId = edgeABID;
             edges[edgeBCID].fLeftId = newFace.id;
+
+            if(edges[edgeBCID].fRightId != -1){
+                glm::vec3 leftFaceNormal = faces[edges[edgeBCID].fLeftId].faceNormal;
+                glm::vec3 rightFaceNormal = faces[edges[edgeBCID].fRightId].faceNormal;
+                edges[edgeBCID].edgeInstantNormal = glm::normalize(leftFaceNormal + rightFaceNormal);
+            }
         }
     }
 
@@ -168,11 +193,23 @@ void WingedEdgeMesh::AddFaceFromVertices(int vertexA, int vertexB, int vertexC) 
             edges[edgeCAID].eRightNextId = edgeBCID;
             edges[edgeCAID].eRightPrevId = edgeABID;
             edges[edgeCAID].fRightId = newFace.id;
+
+            if(edges[edgeCAID].fLeftId != -1){
+                glm::vec3 leftFaceNormal = faces[edges[edgeCAID].fLeftId].faceNormal;
+                glm::vec3 rightFaceNormal = faces[edges[edgeCAID].fRightId].faceNormal;
+                edges[edgeCAID].edgeInstantNormal = glm::normalize(leftFaceNormal + rightFaceNormal);
+            }
         }
         else if (edges[edgeCAID].fLeftId == -1) {
             edges[edgeCAID].eLeftNextId = edgeABID;
             edges[edgeCAID].eLeftPrevId = edgeBCID;
             edges[edgeCAID].fLeftId = newFace.id;
+
+            if(edges[edgeCAID].fRightId != -1){
+                glm::vec3 leftFaceNormal = faces[edges[edgeCAID].fLeftId].faceNormal;
+                glm::vec3 rightFaceNormal = faces[edges[edgeCAID].fRightId].faceNormal;
+                edges[edgeCAID].edgeInstantNormal = glm::normalize(leftFaceNormal + rightFaceNormal);
+            }
         }
     }
 
@@ -192,10 +229,30 @@ std::vector<glm::vec3> WingedEdgeMesh::ExtractVerticesPositions(){
     return verticesCoordinates;
 }
 
-void WingedEdgeMesh::DeleteFace(int faceID){
+bool WingedEdgeMesh::EdgeSeesOtherHull(glm::vec3 edgeNormal, glm::vec3 edgeVertex, std::vector<glm::vec3> otherHullVertices){
+    const float epsilon = 1e-6f;
+    float dot;
+    int pointsInFront = 0;
+
+    for (const auto& vertex : otherHullVertices){
+        dot = glm::dot(vertex - edgeVertex, edgeNormal);
+        if(dot > epsilon){
+            pointsInFront++;
+            if (pointsInFront >= 2) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void WingedEdgeMesh::DeleteFace(int faceID, std::vector<glm::vec3> otherHullcloudPoints){
     int mainEdgeID = faces[faceID].edgeId;
     int forwardEdgeID, backwardEdgeID;
     bool isLeftFaceMainEdge, isLeftFaceForwardEdge, isLeftFaceBackwardEdge;
+
+    bool mainEdgeNotPersistant, forwardEdgeNotPersistant, backwardEdgeNotPersistant;
 
     if(edges[mainEdgeID].fLeftId == faceID){
         forwardEdgeID = edges[mainEdgeID].eLeftNextId;
@@ -219,16 +276,34 @@ void WingedEdgeMesh::DeleteFace(int faceID){
     else
         isLeftFaceBackwardEdge = false;
 
-    DeleteFaceFromEdge(faceID, mainEdgeID, isLeftFaceMainEdge);
-    DeleteFaceFromEdge(faceID, forwardEdgeID, isLeftFaceForwardEdge);
-    DeleteFaceFromEdge(faceID, backwardEdgeID, isLeftFaceBackwardEdge);
+
+    //TEST EDGES PERSISTANCE
+    mainEdgeNotPersistant = EdgeSeesOtherHull(edges[mainEdgeID].edgeInstantNormal, vertices[edges[mainEdgeID].vStartId].position, otherHullcloudPoints);
+    forwardEdgeNotPersistant = EdgeSeesOtherHull(edges[forwardEdgeID].edgeInstantNormal, vertices[edges[forwardEdgeID].vStartId].position, otherHullcloudPoints);
+    backwardEdgeNotPersistant = EdgeSeesOtherHull(edges[backwardEdgeID].edgeInstantNormal, vertices[edges[backwardEdgeID].vStartId].position, otherHullcloudPoints);
+
+    if(mainEdgeID == 1){
+        std::cout << "Edge 1 is not persistent: " << mainEdgeNotPersistant << std::endl;
+    }
+
+    if(forwardEdgeID == 1){
+        std::cout << "Edge 1 is not persistent: " << forwardEdgeNotPersistant << std::endl;
+    }
+
+    if(backwardEdgeID == 1){
+        std::cout << "Edge 1 is not persistent: " << backwardEdgeNotPersistant << std::endl;
+    }
+
+    DeleteFaceFromEdge(faceID, mainEdgeID, isLeftFaceMainEdge, mainEdgeNotPersistant);
+    DeleteFaceFromEdge(faceID, forwardEdgeID, isLeftFaceForwardEdge, forwardEdgeNotPersistant);
+    DeleteFaceFromEdge(faceID, backwardEdgeID, isLeftFaceBackwardEdge, backwardEdgeNotPersistant);
 
     faces[faceID].edgeId = -1;
     faces[faceID].id = -1;
     faces[faceID].faceNormal = glm::vec3(0,0,0);
 }
 
-void WingedEdgeMesh::DeleteFaceFromEdge(int faceID, int edgeID, bool isLeftFace){
+void WingedEdgeMesh::DeleteFaceFromEdge(int faceID, int edgeID, bool isLeftFace, bool edgeIsNotPersistant){
     if (isLeftFace){
         edges[edgeID].eLeftNextId = -1;
         edges[edgeID].eLeftPrevId = -1;
@@ -240,11 +315,19 @@ void WingedEdgeMesh::DeleteFaceFromEdge(int faceID, int edgeID, bool isLeftFace)
             else if (vertices[edges[edgeID].vStartId].edgeId == edgeID)
                 vertices[edges[edgeID].vStartId].edgeId = -1;
             
-            edges[edgeID].vStartId = -1;
-            edges[edgeID].vEndId = -1;
-            edges[edgeID].id = -1;
+            if(edgeIsNotPersistant){
+                edges[edgeID].vStartId = -1;
+                edges[edgeID].vEndId = -1;
+                edges[edgeID].id = -1;
 
-            openEdgesQueue.erase(std::remove(openEdgesQueue.begin(), openEdgesQueue.end(), edgeID), openEdgesQueue.end());
+                openEdgesQueue.erase(std::remove(openEdgesQueue.begin(), openEdgesQueue.end(), edgeID), openEdgesQueue.end());
+            }
+
+            else{//edge is persistant
+                std::cout << " FOUND PERSISTANT EDGE1" << std::endl;
+                std::cout << " Edge Id: " << edgeID << std::endl;
+                openEdgesQueue.push_back(edgeID);
+            }
         }
 
         else {
@@ -263,11 +346,21 @@ void WingedEdgeMesh::DeleteFaceFromEdge(int faceID, int edgeID, bool isLeftFace)
             else if (vertices[edges[edgeID].vStartId].edgeId == edgeID)
                 vertices[edges[edgeID].vStartId].edgeId = -1;
             
-            edges[edgeID].vStartId = -1;
-            edges[edgeID].vEndId = -1;
-            edges[edgeID].id = -1;
 
-            openEdgesQueue.erase(std::remove(openEdgesQueue.begin(), openEdgesQueue.end(), edgeID), openEdgesQueue.end());
+            if(edgeIsNotPersistant){
+                edges[edgeID].vStartId = -1;
+                edges[edgeID].vEndId = -1;
+                edges[edgeID].id = -1;
+
+                openEdgesQueue.erase(std::remove(openEdgesQueue.begin(), openEdgesQueue.end(), edgeID), openEdgesQueue.end());
+            }
+
+            else{//edge is persistant
+                std::cout << " FOUND PERSISTANT EDGE2" << std::endl;
+                std::cout << " Edge Id: " << edgeID << std::endl;
+                openEdgesQueue.push_back(edgeID);
+            }
+
         }
 
         else {
@@ -398,10 +491,27 @@ void WingedEdgeMesh::AppendDataToLinkHulls(int verticesAmount, int edgesAmount, 
         }
 }
 
+void WingedEdgeMesh::DeleteEdgeFromLeftHullOpenEdgesQueue(int edgeId){
+    for (auto it = leftHullOpenEdgesQueue.rbegin(); it != leftHullOpenEdgesQueue.rend(); ++it) {
+        if (*it == edgeId) {
+            leftHullOpenEdgesQueue.erase(std::next(it).base());
+            break;
+        }
+    }
+}
+
+void WingedEdgeMesh::DeleteEdgeFromRightHullOpenEdgesQueue(int edgeId){
+    for (auto it = rightHullOpenEdgesQueue.rbegin(); it != rightHullOpenEdgesQueue.rend(); ++it) {
+        if (*it == edgeId) {
+            rightHullOpenEdgesQueue.erase(std::next(it).base());
+            break;
+        }
+    }
+}
+
 void WingedEdgeMesh::AddFirstMergingEdge(){
     int lowestLeftHullVertexY, lowestRightHullVertexY, lowestLeftHullVertexYIndex, lowestRightHullVertexYIndex;
     int leftHullEdgeOrigin, rightHullEdgeOrigin;
-
 
     //CAN IMPROVE TO CHECK POINTS ONLY ONCE, DOING IT LAZY NOW AND CHECKING TWICE
     for(int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
@@ -480,14 +590,14 @@ void WingedEdgeMesh::AddFirstMergingEdge(){
 
     //DebugPrint();
 
-   // std::cout<< "left edges :" <<std::endl;
-   // for (int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
-   //     std::cout<< leftHullOpenEdgesQueue[i] <<std::endl;
-   // }
-   // std::cout<< "right edges :" <<std::endl;
-   // for (int i = 0; i < rightHullOpenEdgesQueue.size(); i++){
-   //     std::cout<< rightHullOpenEdgesQueue[i] <<std::endl;
-   // }
+    //std::cout<< "left edges :" <<std::endl;
+    //for (int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
+    //    std::cout<< leftHullOpenEdgesQueue[i] <<std::endl;
+    //}
+    //std::cout<< "right edges :" <<std::endl;
+    //for (int i = 0; i < rightHullOpenEdgesQueue.size(); i++){
+    //    std::cout<< rightHullOpenEdgesQueue[i] <<std::endl;
+    //}
 
 }
 
@@ -516,7 +626,8 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
     if(edges[startEdgeLeftId].fLeftId == -1){
         if (edges[startEdgeLeftId].vEndId == startVertexLeftId){
             orderedCWLeftHull.push_back(startEdgeLeftId);
-            leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());
+            //leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());
+            DeleteEdgeFromLeftHullOpenEdgesQueue(startEdgeLeftId);
             nextVertexToLookForLeft = edges[startEdgeLeftId].vStartId;
         }
         else if (edges[startEdgeLeftId].vStartId == startVertexLeftId){
@@ -526,14 +637,14 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
                         startEdgeLeftId = leftHullOpenEdgesQueue[i];
                         orderedCWLeftHull.push_back(startEdgeLeftId);
                         nextVertexToLookForLeft = edges[startEdgeLeftId].vStartId;
-                        leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());  
+                        DeleteEdgeFromLeftHullOpenEdgesQueue(startEdgeLeftId);  
                         break;
                     }
 
                     else if(edges[i].vStartId == startVertexLeftId && (edges[i].fRightId == -1 || edges[i].fLeftId == -1)){
                         startEdgeLeftId = i;
                         orderedCWLeftHull.push_back(startEdgeLeftId);
-                        leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());
+                        DeleteEdgeFromLeftHullOpenEdgesQueue(startEdgeLeftId);
                         nextVertexToLookForLeft = edges[i].vEndId;
                         break;
                     }
@@ -545,7 +656,7 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
     else if(edges[startEdgeLeftId].fRightId == -1){
         if (edges[startEdgeLeftId].vStartId == startVertexLeftId){
             orderedCWLeftHull.push_back(startEdgeLeftId);
-            leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());
+            DeleteEdgeFromLeftHullOpenEdgesQueue(startEdgeLeftId);
             nextVertexToLookForLeft = edges[startEdgeLeftId].vEndId;
         }
         else if (edges[startEdgeLeftId].vEndId == startVertexLeftId){
@@ -555,7 +666,7 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
                         startEdgeLeftId = leftHullOpenEdgesQueue[i];
                         orderedCWLeftHull.push_back(startEdgeLeftId);
                         nextVertexToLookForLeft = edges[startEdgeLeftId].vStartId;
-                        leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());  
+                        DeleteEdgeFromLeftHullOpenEdgesQueue(startEdgeLeftId);  
                         break;
                     }
 
@@ -563,7 +674,7 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
                         startEdgeLeftId = leftHullOpenEdgesQueue[i];
                         orderedCWLeftHull.push_back(startEdgeLeftId);
                         nextVertexToLookForLeft = edges[startEdgeLeftId].vEndId;
-                        leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), startEdgeLeftId), leftHullOpenEdgesQueue.end());
+                        DeleteEdgeFromLeftHullOpenEdgesQueue(startEdgeLeftId);
                         break;
                     }
                 }
@@ -574,7 +685,8 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
     if(edges[startEdgeRightId].fLeftId == -1){
         if (edges[startEdgeRightId].vStartId == startVertexRightId){
             orderedCCWRightHull.push_back(startEdgeRightId);
-            rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());
+            //rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());
+            DeleteEdgeFromRightHullOpenEdgesQueue(startEdgeRightId);
             nextVertexToLookForRight = edges[startEdgeRightId].vEndId; 
         }
         else if (edges[startEdgeRightId].vEndId == startVertexRightId){
@@ -584,7 +696,7 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
                         startEdgeRightId = rightHullOpenEdgesQueue[i];
                         orderedCCWRightHull.push_back(startEdgeRightId);
                         nextVertexToLookForRight = edges[startEdgeRightId].vStartId; 
-                        rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());  
+                        DeleteEdgeFromRightHullOpenEdgesQueue(startEdgeRightId);  
                         break;
                     }
 
@@ -592,7 +704,7 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
                         startEdgeRightId = rightHullOpenEdgesQueue[i];
                         orderedCCWRightHull.push_back(startEdgeRightId);
                         nextVertexToLookForRight = edges[startEdgeRightId].vEndId;
-                        rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());
+                        DeleteEdgeFromRightHullOpenEdgesQueue(startEdgeRightId);
                         break;
                     }
                 }
@@ -603,7 +715,7 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
     else if(edges[startEdgeRightId].fRightId == -1){
         if (edges[startEdgeRightId].vEndId == startVertexRightId){
             orderedCCWRightHull.push_back(startEdgeRightId);
-            rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());
+            DeleteEdgeFromRightHullOpenEdgesQueue(startEdgeRightId);
             nextVertexToLookForRight = edges[startEdgeRightId].vStartId; 
         }
         else if (edges[startEdgeRightId].vStartId == startVertexRightId){
@@ -613,7 +725,7 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
                         startEdgeRightId = rightHullOpenEdgesQueue[i];
                         orderedCCWRightHull.push_back(startEdgeRightId);
                         nextVertexToLookForRight = edges[startEdgeRightId].vStartId;
-                        rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());  
+                        DeleteEdgeFromRightHullOpenEdgesQueue(startEdgeRightId);  
                         break;
                     }
 
@@ -621,7 +733,7 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
                         startEdgeRightId = rightHullOpenEdgesQueue[i];
                         orderedCCWRightHull.push_back(startEdgeRightId);
                         nextVertexToLookForRight = edges[startEdgeRightId].vEndId;
-                        rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), startEdgeRightId), rightHullOpenEdgesQueue.end());
+                        DeleteEdgeFromRightHullOpenEdgesQueue(startEdgeRightId);
                         break;
                     }
                 }
@@ -629,19 +741,29 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
         }
     }
 
+    int lastIndex = -1;
+
     while (leftHullOpenEdgesQueue.size() > 0){
+        
+        if(lastIndex != leftHullOpenEdgesQueue.size()){
+            lastIndex = leftHullOpenEdgesQueue.size();
+            std::cout << " leftHullOpenEdgesQueue:" << std::endl;
+            for (int i = 0 ; i < leftHullOpenEdgesQueue.size(); i++){
+                std::cout << leftHullOpenEdgesQueue[i] << " " << std::endl;
+            }
+        }       
 
         for (int i = 0; i < leftHullOpenEdgesQueue.size(); i++){
             if(edges[leftHullOpenEdgesQueue[i]].vEndId == nextVertexToLookForLeft){
                 orderedCWLeftHull.push_back(leftHullOpenEdgesQueue[i]);
                 nextVertexToLookForLeft = edges[leftHullOpenEdgesQueue[i]].vStartId;
-                leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), leftHullOpenEdgesQueue[i]), leftHullOpenEdgesQueue.end());
+                DeleteEdgeFromLeftHullOpenEdgesQueue(leftHullOpenEdgesQueue[i]);
             }
 
             else if(edges[leftHullOpenEdgesQueue[i]].vStartId == nextVertexToLookForLeft){
                 orderedCWLeftHull.push_back(leftHullOpenEdgesQueue[i]);
                 nextVertexToLookForLeft = edges[leftHullOpenEdgesQueue[i]].vEndId;
-                leftHullOpenEdgesQueue.erase(std::remove(leftHullOpenEdgesQueue.begin(), leftHullOpenEdgesQueue.end(), leftHullOpenEdgesQueue[i]), leftHullOpenEdgesQueue.end());
+                DeleteEdgeFromLeftHullOpenEdgesQueue(leftHullOpenEdgesQueue[i]);
             }
         }
     }
@@ -652,13 +774,13 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
             if(edges[rightHullOpenEdgesQueue[i]].vEndId == nextVertexToLookForRight){
                 orderedCCWRightHull.push_back(rightHullOpenEdgesQueue[i]);
                 nextVertexToLookForRight = edges[rightHullOpenEdgesQueue[i]].vStartId;
-                rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), rightHullOpenEdgesQueue[i]), rightHullOpenEdgesQueue.end());
+                DeleteEdgeFromRightHullOpenEdgesQueue(rightHullOpenEdgesQueue[i]);
             }
 
             else if(edges[rightHullOpenEdgesQueue[i]].vStartId == nextVertexToLookForRight){
                 orderedCCWRightHull.push_back(rightHullOpenEdgesQueue[i]);
                 nextVertexToLookForRight = edges[rightHullOpenEdgesQueue[i]].vEndId;
-                rightHullOpenEdgesQueue.erase(std::remove(rightHullOpenEdgesQueue.begin(), rightHullOpenEdgesQueue.end(), rightHullOpenEdgesQueue[i]), rightHullOpenEdgesQueue.end());
+                DeleteEdgeFromRightHullOpenEdgesQueue(rightHullOpenEdgesQueue[i]);
             } 
         }
     }
@@ -669,15 +791,17 @@ void WingedEdgeMesh::OrderLeftAndRightQueues(int startVertexLeftId, int startVer
     rightHullOpenEdgesQueue = orderedCCWRightHull;
     leftHullOpenEdgesQueue = orderedCWLeftHull;
 
-    //std::cout << " leftHullOpenEdgesQueue after:" << std::endl;
-    //for (int i = 0 ; i < leftHullOpenEdgesQueue.size(); i++){
-    //    std::cout << leftHullOpenEdgesQueue[i] << " " << std::endl;
-    //}
-//
-    //std::cout << " rightHullOpenEdgesQueue after:" << std::endl;
-    //for (int i = 0 ; i < rightHullOpenEdgesQueue.size(); i++){
-    //    std::cout << rightHullOpenEdgesQueue[i] << " " << std::endl;
-    //}
+    DebugPrint();
+
+    std::cout << " leftHullOpenEdgesQueue after:" << std::endl;
+    for (int i = 0 ; i < leftHullOpenEdgesQueue.size(); i++){
+        std::cout << leftHullOpenEdgesQueue[i] << " " << std::endl;
+    }
+
+    std::cout << " rightHullOpenEdgesQueue after:" << std::endl;
+    for (int i = 0 ; i < rightHullOpenEdgesQueue.size(); i++){
+        std::cout << rightHullOpenEdgesQueue[i] << " " << std::endl;
+    }
 
 }
 
@@ -691,7 +815,7 @@ void WingedEdgeMesh::SewHulls(){
 
     int firtsSewedEdge = openEdgesQueue.back();
 
-    int maxSewings = 4;
+    int maxSewings = 9;
     int sewings = 0;
 
     while(openEdgesQueue.size() > 0 ){
@@ -864,6 +988,10 @@ void WingedEdgeMesh::DebugPrint() const {
 
         std::cout << "    RightPrev: " << e.eRightPrevId
                   << ", RightNext: " << e.eRightNextId << '\n';
+
+        std::cout << ", EdgeInstantNormal " << ": ("
+        << e.edgeInstantNormal.x << ", " << e.edgeInstantNormal.y << ", " << e.edgeInstantNormal.z
+        << ")" << '\n';
     }
     std::cout << "=====================\n";
 }

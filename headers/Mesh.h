@@ -31,7 +31,7 @@ public:
 
     WingedEdgeMesh InitialHull(const std::vector<Vector3>& group);
 
-    bool FaceSeeOtherHull(glm::vec3 faceNormal, glm::vec3 faceVertex, std::vector<glm::vec3> otherHullVertices);
+    bool FaceSeesOtherHull(glm::vec3 faceNormal, glm::vec3 faceVertex, std::vector<glm::vec3> otherHullVertices);
 
     void MergeHull();
 

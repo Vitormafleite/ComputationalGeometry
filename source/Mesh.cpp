@@ -331,10 +331,13 @@ WingedEdgeMesh Mesh::InitialHull(const std::vector<Vector3>& group) {
             hull.AddFaceFromVertices(vIds[vertex1ID], vIds[vertex2ID], vIds[vertex3ID]);
         }
     }
+
+    //hull.DebugPrint();
+
     return hull;
 }
 
-bool Mesh::FaceSeeOtherHull(glm::vec3 faceNormal, glm::vec3 faceVertex, std::vector<glm::vec3> otherHullVertices){
+bool Mesh::FaceSeesOtherHull(glm::vec3 faceNormal, glm::vec3 faceVertex, std::vector<glm::vec3> otherHullVertices){
     const float epsilon = 1e-6f;
     float dot;
 
@@ -356,7 +359,7 @@ void Mesh::MergeHull(){
     std::vector<WingedEdgeMesh> mergingHulls;
     std::vector<std::vector<WingedEdgeMesh>> mergingHullsPartitions;
 
-    while (!allPartitionsDone){
+    //while (!allPartitionsDone){
         for (int partition = 0; partition < mergeHullPartitionsColections[mergeStep].size();partition++){
             for (int hull = 0; hull < mergeHullPartitionsColections[mergeStep][partition].size(); hull+=2){
             
@@ -383,7 +386,7 @@ void Mesh::MergeHull(){
                 allPartitionsDone = false;
         }
 
-    }
+    //}
 }
 
 WingedEdgeMesh Mesh::LinkHulls(WingedEdgeMesh leftHull, WingedEdgeMesh rightHull){
@@ -429,6 +432,9 @@ WingedEdgeMesh Mesh::MergeTwoHulls(WingedEdgeMesh leftHull, WingedEdgeMesh right
 
     //std::cout << "leftHullfaces.size(): " << leftHull.faces.size() << std::endl;
 
+    //leftHull.DebugPrint();
+
+
     for(int faceId = 0; faceId < leftHull.faces.size(); faceId++){
         faceNormal = leftHull.faces[faceId].faceNormal;
 
@@ -436,10 +442,10 @@ WingedEdgeMesh Mesh::MergeTwoHulls(WingedEdgeMesh leftHull, WingedEdgeMesh right
         vertexID = leftHull.edges[edgeId].vStartId;
         faceVertexPosition = leftHull.vertices[vertexID].position;
 
-        faceSeesOtherHull = FaceSeeOtherHull(faceNormal, faceVertexPosition, rightHullVerticesPositions);
+        faceSeesOtherHull = FaceSeesOtherHull(faceNormal, faceVertexPosition, rightHullVerticesPositions);
 
         if(faceSeesOtherHull){
-            leftHull.DeleteFace(faceId);
+            leftHull.DeleteFace(faceId, rightHullVerticesPositions);
             hullsAreColinear = false;
         }
     }
@@ -451,10 +457,10 @@ WingedEdgeMesh Mesh::MergeTwoHulls(WingedEdgeMesh leftHull, WingedEdgeMesh right
         vertexID = rightHull.edges[edgeId].vStartId;
         faceVertexPosition = rightHull.vertices[vertexID].position;
 
-        faceSeesOtherHull = FaceSeeOtherHull(faceNormal, faceVertexPosition, leftHullVerticesPositions);
+        faceSeesOtherHull = FaceSeesOtherHull(faceNormal, faceVertexPosition, leftHullVerticesPositions);
 
         if(faceSeesOtherHull){
-            rightHull.DeleteFace(faceId);
+            rightHull.DeleteFace(faceId, leftHullVerticesPositions);
             hullsAreColinear = false;
         }
     }
@@ -463,31 +469,34 @@ WingedEdgeMesh Mesh::MergeTwoHulls(WingedEdgeMesh leftHull, WingedEdgeMesh right
         
     }
 
+
     leftHull.FixMeshAfterDeletions();
+    
     rightHull.FixMeshAfterDeletions();
 
     WingedEdgeMesh resultHull = LinkHulls(leftHull, rightHull);
 
+
     resultHull.AddFirstMergingEdge();
 
-    resultHull.SewHulls();
+    //resultHull.SewHulls();
 
-//    resultHull.DebugPrint();
+    resultHull.DebugPrint();
+
+    //std::cout << "LEFT HULL OPEN EDGES: " << std::endl;
+    //for (int i = 0 ; i < resultHull.leftHullOpenEdgesQueue.size(); i++){
+    //    std::cout << resultHull.leftHullOpenEdgesQueue[i] << " " << std::endl;
+    //}
+    //
+    //std::cout << " RIGHT HULL OPEN EDGES:" << std::endl;
+    //for (int i = 0 ; i < resultHull.rightHullOpenEdgesQueue.size(); i++){
+    //    std::cout << resultHull.rightHullOpenEdgesQueue[i] << " " << std::endl;
+    //}
 //
-//    std::cout << "LEFT HULL OPEN EDGES: " << std::endl;
-//    for (int i = 0 ; i < resultHull.leftHullOpenEdgesQueue.size(); i++){
-//        std::cout << resultHull.leftHullOpenEdgesQueue[i] << " " << std::endl;
-//    }
-//    
-//    std::cout << " RIGHT HULL OPEN EDGES:" << std::endl;
-//    for (int i = 0 ; i < resultHull.rightHullOpenEdgesQueue.size(); i++){
-//        std::cout << resultHull.rightHullOpenEdgesQueue[i] << " " << std::endl;
-//    }
-//
-//    std::cout << " ALL OPEN EDGES:" << std::endl;
-//    for (int i = 0 ; i < resultHull.openEdgesQueue.size(); i++){
-//        std::cout << resultHull.openEdgesQueue[i] << " " << std::endl;
-//    }
+    //std::cout << " ALL OPEN EDGES:" << std::endl;
+    //for (int i = 0 ; i < resultHull.openEdgesQueue.size(); i++){
+    //    std::cout << resultHull.openEdgesQueue[i] << " " << std::endl;
+    //}
 
     return resultHull;
 }

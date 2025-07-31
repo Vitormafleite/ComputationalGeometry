@@ -38,17 +38,19 @@ struct WingedEdge {
     int eRightPrevId = -1;
     int eRightNextId = -1;
 
+    glm::vec3 edgeInstantNormal;
+
     WingedEdge()
         : id(-1), vStartId(-1), vEndId(-1),
           fLeftId(-1), fRightId(-1),
           eLeftPrevId(-1), eLeftNextId(-1),
-          eRightPrevId(-1), eRightNextId(-1) {}
+          eRightPrevId(-1), eRightNextId(-1), edgeInstantNormal(glm::vec3()) {}
 
     WingedEdge(int id, int vStartId, int vEndId)
         : id(id), vStartId(vStartId), vEndId(vEndId),
           fLeftId(-1), fRightId(-1),
           eLeftPrevId(-1), eLeftNextId(-1),
-          eRightPrevId(-1), eRightNextId(-1) {}
+          eRightPrevId(-1), eRightNextId(-1), edgeInstantNormal(glm::vec3()) {}
  
 };
 
@@ -59,10 +61,13 @@ public:
     std::vector<Face> faces;
 
     std::vector<int> openEdgesQueue; // while we build the winged edge table, edges only get half built when a face is inserted, so we need to track that and fill them later 
-    
+    std::vector<int> persistantEdgesQueue;
     //use this for merging only
     std::vector<int> leftHullOpenEdgesQueue;
     std::vector<int> rightHullOpenEdgesQueue;
+
+    std::vector<int> leftHullPersistantEdgesQueue;
+    std::vector<int> rightHullPersistantEdgesQueue;
 
     int AddVertex(const glm::vec3& pos);
 
@@ -70,8 +75,11 @@ public:
 
     std::vector<glm::vec3> ExtractVerticesPositions(); 
 
-    void DeleteFace(int faceID);
-    void DeleteFaceFromEdge(int faceID, int EdgeID, bool isLeftFace);
+    void DeleteFace(int faceID, std::vector<glm::vec3> otherHullcloudPoints);
+    bool EdgeSeesOtherHull(glm::vec3 edgeNormal, glm::vec3 edgeVertex, std::vector<glm::vec3> otherHullVertices);
+    void DeleteFaceFromEdge(int faceID, int EdgeID, bool isLeftFace, bool edgeIsNotPersistant);
+    void DeleteEdgeFromLeftHullOpenEdgesQueue(int edgeId);
+    void DeleteEdgeFromRightHullOpenEdgesQueue(int edgeId);
 
     void FixMeshAfterDeletions();
     void AppendDataToLinkHulls(int verticesAmount, int edgesAmount, int facesAmount);
